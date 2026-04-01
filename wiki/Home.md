@@ -1,0 +1,49 @@
+# TeddyCup-C-EventDriven
+
+面向**泰迪杯 C 题"事件驱动型股市投资策略构建"**的完整解决方案实现。
+
+## 核心能力
+
+本项目实现了从事件感知到策略落地的全链条分析，覆盖竞赛要求的四个阶段：
+
+| 阶段 | 任务 | 核心模块 |
+|---|---|---|
+| Task 1 | 事件识别与分类 | `task1_event_identify.py` |
+| Task 2 | 事件关联公司挖掘 | `task2_relation_mining.py` |
+| Task 3 | 事件影响预测与逻辑链条 | `task3_impact_estimate.py` + `event_study_enhanced.py` |
+| Task 4 | 投资策略构建 | `task4_strategy.py` |
+
+## 快速开始
+
+```bash
+# 激活虚拟环境
+source .venv/bin/activate
+
+# 周度实测（竞赛提交用）
+python main_weekly.py --asof 2026-04-20
+
+# 历史回测
+python main_backtest.py --start 2025-12-08 --end 2025-12-26
+```
+
+## 竞赛时间线
+
+- **第一周提交**：2026-04-20 ~ 2026-04-21
+- **第二周提交**：2026-04-27 ~ 2026-04-28
+
+## 项目结构
+
+```
+pipeline/
+├── fetch_data.py           # 数据采集（新闻/行情/财务/停复牌）
+├── task1_event_identify.py # 事件识别与分类
+├── task2_relation_mining.py # 事件-公司关联关系
+├── task3_impact_estimate.py # CAR 影响预测
+├── event_study_enhanced.py   # 事件研究增强（标准 CAR 图）
+├── industry_chain_enhanced.py # 产业链图谱
+├── task4_strategy.py        # 策略构建与仓位分配
+├── report_builder.py         # 周报生成
+├── workflow.py              # 完整流水线编排
+├── backtest.py              # 回测引擎
+└── models.py               # 数据模型
+```

@@ -1,0 +1,52 @@
+project:
+  name: TeddyCup-C-EventDriven
+  timezone: Asia/Shanghai
+  initial_capital: 100000
+
+data:
+  lookback_days: 14
+  news_sources:
+    - qstock
+    - manual
+  market_sources:
+    - tushare
+    - manual
+  benchmark_code: hs300
+  use_sample_if_unavailable: true
+  strict_real_data: false
+  allow_synthetic_future_extension: true
+
+tushare:
+  token_env: TUSHARE_TOKEN
+  token: "dfe0d353d766151c848b0bbd2f84fc22db5fba75815d49158a405dae"
+
+strategy:
+  max_positions: 3
+  single_position_max: 0.5
+  single_position_min: 0.2
+  min_listing_days: 60
+  min_avg_turnover_million: 80
+  positive_score_threshold: 0.02
+
+scoring:
+  association:
+    direct_mention: 0.45
+    business_match: 0.25
+    industry_overlap: 0.20
+    historical_co_move: 0.10
+  prediction:
+    expected_car_4d: 0.40
+    association_score: 0.25
+    event_score: 0.20
+    liquidity_score: 0.10
+    risk_penalty: 0.05
+
+event_study:
+  estimation_window_start: -60
+  estimation_window_end: -6
+  event_window_start: -1
+  event_window_end: 4
+
+report:
+  top_event_count: 5
+  top_relation_count: 12

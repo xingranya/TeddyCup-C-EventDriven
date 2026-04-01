@@ -1,0 +1,363 @@
+{
+  "军工": {
+    "theme_name": "军工",
+    "summary": "围绕军机整机、机载配套、导弹弹药和军工材料构建产业链传导路径。",
+    "keywords": ["军工", "导弹", "战机", "空战", "无人机", "国防", "装备", "实战", "火箭", "军贸"],
+    "links": [
+      {
+        "link_name": "整机制造",
+        "keywords": ["战机", "整机", "航空装备", "军贸", "军机"],
+        "template": "事件 -> 军工主题 -> 整机制造 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "600760",
+            "stock_name": "中航沈飞",
+            "relation_type": "产业链核心整机",
+            "relation_path": "事件 -> 军工主题 -> 整机制造 -> 中航沈飞"
+          }
+        ]
+      },
+      {
+        "link_name": "机载配套",
+        "keywords": ["无人机", "机载", "航空电子", "飞控", "航空配套"],
+        "template": "事件 -> 军工主题 -> 机载配套 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "300581",
+            "stock_name": "晨曦航空",
+            "relation_type": "无人机与机载配套",
+            "relation_path": "事件 -> 军工主题 -> 机载配套 -> 晨曦航空"
+          }
+        ]
+      },
+      {
+        "link_name": "导弹弹药",
+        "keywords": ["导弹", "弹药", "固体火箭", "高超音速"],
+        "template": "事件 -> 军工主题 -> 导弹弹药 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "688543",
+            "stock_name": "国科军工",
+            "relation_type": "导弹与弹药配套",
+            "relation_path": "事件 -> 军工主题 -> 导弹弹药 -> 国科军工"
+          },
+          {
+            "stock_code": "003009",
+            "stock_name": "中天火箭",
+            "relation_type": "固体火箭配套",
+            "relation_path": "事件 -> 军工主题 -> 导弹弹药 -> 中天火箭"
+          }
+        ]
+      },
+      {
+        "link_name": "军工材料",
+        "keywords": ["碳纤维", "复材", "高温材料", "新材料"],
+        "template": "事件 -> 军工主题 -> 军工材料 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "688033",
+            "stock_name": "天宜上佳",
+            "relation_type": "军工材料配套",
+            "relation_path": "事件 -> 军工主题 -> 军工材料 -> 天宜上佳"
+          },
+          {
+            "stock_code": "300699",
+            "stock_name": "光威复材",
+            "relation_type": "军工碳纤维材料",
+            "relation_path": "事件 -> 军工主题 -> 军工材料 -> 光威复材"
+          }
+        ]
+      }
+    ],
+    "stocks": [
+      {
+        "stock_code": "600760",
+        "stock_name": "中航沈飞",
+        "relation_type": "产业链核心整机",
+        "relation_path": "地缘或装备事件 -> 军机需求提升 -> 整机制造商受益"
+      },
+      {
+        "stock_code": "300581",
+        "stock_name": "晨曦航空",
+        "relation_type": "无人机与机载配套",
+        "relation_path": "装备事件 -> 航空配套需求提升 -> 机载系统公司受益"
+      },
+      {
+        "stock_code": "688543",
+        "stock_name": "国科军工",
+        "relation_type": "导弹与弹药配套",
+        "relation_path": "导弹或实战事件 -> 弹药需求增加 -> 导弹配套公司受益"
+      },
+      {
+        "stock_code": "003009",
+        "stock_name": "中天火箭",
+        "relation_type": "固体火箭配套",
+        "relation_path": "导弹事件 -> 固体火箭产业链受关注 -> 配套公司受益"
+      }
+    ]
+  },
+  "科技": {
+    "theme_name": "科技/算力",
+    "summary": "围绕算力基础设施、高速互联、半导体设备和高端芯片构建科技主线传导。",
+    "keywords": ["算力", "AI", "人工智能", "服务器", "芯片", "半导体", "光模块", "数据中心", "国产替代"],
+    "links": [
+      {
+        "link_name": "算力基础设施",
+        "keywords": ["服务器", "数据中心", "算力基础设施", "高性能计算"],
+        "template": "事件 -> 科技主题 -> 算力基础设施 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "603019",
+            "stock_name": "中科曙光",
+            "relation_type": "算力基础设施",
+            "relation_path": "事件 -> 科技主题 -> 算力基础设施 -> 中科曙光"
+          }
+        ]
+      },
+      {
+        "link_name": "高速互联",
+        "keywords": ["光模块", "高速互联", "网络升级", "交换", "通信链路"],
+        "template": "事件 -> 科技主题 -> 高速互联 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "300308",
+            "stock_name": "中际旭创",
+            "relation_type": "高速光模块",
+            "relation_path": "事件 -> 科技主题 -> 高速互联 -> 中际旭创"
+          }
+        ]
+      },
+      {
+        "link_name": "半导体设备",
+        "keywords": ["半导体设备", "资本开支", "设备", "刻蚀", "沉积"],
+        "template": "事件 -> 科技主题 -> 半导体设备 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "002371",
+            "stock_name": "北方华创",
+            "relation_type": "半导体设备",
+            "relation_path": "事件 -> 科技主题 -> 半导体设备 -> 北方华创"
+          }
+        ]
+      },
+      {
+        "link_name": "高端芯片",
+        "keywords": ["芯片", "处理器", "CPU", "高端芯片", "加速器"],
+        "template": "事件 -> 科技主题 -> 高端芯片 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "688041",
+            "stock_name": "海光信息",
+            "relation_type": "高端芯片",
+            "relation_path": "事件 -> 科技主题 -> 高端芯片 -> 海光信息"
+          }
+        ]
+      }
+    ],
+    "stocks": [
+      {
+        "stock_code": "603019",
+        "stock_name": "中科曙光",
+        "relation_type": "算力基础设施",
+        "relation_path": "算力政策或订单 -> 服务器需求提升 -> 算力基础设施公司受益"
+      },
+      {
+        "stock_code": "300308",
+        "stock_name": "中际旭创",
+        "relation_type": "高速光模块",
+        "relation_path": "AI算力扩张 -> 网络互联升级 -> 光模块公司受益"
+      },
+      {
+        "stock_code": "002371",
+        "stock_name": "北方华创",
+        "relation_type": "半导体设备",
+        "relation_path": "国产替代加速 -> 半导体资本开支回升 -> 设备公司受益"
+      },
+      {
+        "stock_code": "688041",
+        "stock_name": "海光信息",
+        "relation_type": "高端芯片",
+        "relation_path": "算力升级 -> 高端处理器需求上行 -> 芯片设计公司受益"
+      }
+    ]
+  },
+  "新能源": {
+    "theme_name": "新能源设备",
+    "summary": "围绕逆变器储能、光伏制造和新能源车电池构建设备更新主线。",
+    "keywords": ["新能源", "光伏", "储能", "电池", "设备更新", "充电", "逆变器", "景气改善"],
+    "links": [
+      {
+        "link_name": "逆变器储能",
+        "keywords": ["逆变器", "储能", "PCS", "储能系统"],
+        "template": "事件 -> 新能源主题 -> 逆变器储能 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "300274",
+            "stock_name": "阳光电源",
+            "relation_type": "逆变器与储能",
+            "relation_path": "事件 -> 新能源主题 -> 逆变器储能 -> 阳光电源"
+          }
+        ]
+      },
+      {
+        "link_name": "光伏材料制造",
+        "keywords": ["光伏", "硅料", "电池片", "组件", "制造"],
+        "template": "事件 -> 新能源主题 -> 光伏材料制造 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "600438",
+            "stock_name": "通威股份",
+            "relation_type": "光伏材料与制造",
+            "relation_path": "事件 -> 新能源主题 -> 光伏材料制造 -> 通威股份"
+          }
+        ]
+      },
+      {
+        "link_name": "新能源车电池",
+        "keywords": ["新能源车", "动力电池", "整车", "电池"],
+        "template": "事件 -> 新能源主题 -> 新能源车电池 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "002594",
+            "stock_name": "比亚迪",
+            "relation_type": "新能源车与电池",
+            "relation_path": "事件 -> 新能源主题 -> 新能源车电池 -> 比亚迪"
+          }
+        ]
+      }
+    ],
+    "stocks": [
+      {
+        "stock_code": "300274",
+        "stock_name": "阳光电源",
+        "relation_type": "逆变器与储能",
+        "relation_path": "新能源政策 -> 储能与逆变器需求提升 -> 核心设备公司受益"
+      },
+      {
+        "stock_code": "600438",
+        "stock_name": "通威股份",
+        "relation_type": "光伏材料与制造",
+        "relation_path": "光伏景气改善 -> 产业链需求回暖 -> 上游与制造公司受益"
+      },
+      {
+        "stock_code": "002594",
+        "stock_name": "比亚迪",
+        "relation_type": "新能源车与电池",
+        "relation_path": "新能源刺激政策 -> 整车与电池需求提升 -> 龙头公司受益"
+      }
+    ]
+  },
+  "低空经济": {
+    "theme_name": "低空经济",
+    "summary": "围绕通信基础设施与飞行器配套构建低空经济主线。",
+    "keywords": ["低空经济", "低空", "飞行器", "空域", "eVTOL", "通航", "低空基础设施"],
+    "links": [
+      {
+        "link_name": "通信基础设施",
+        "keywords": ["通信", "连接", "天线", "低空通信", "基础设施"],
+        "template": "事件 -> 低空经济主题 -> 通信基础设施 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "002792",
+            "stock_name": "通宇通讯",
+            "relation_type": "通信基础设施",
+            "relation_path": "事件 -> 低空经济主题 -> 通信基础设施 -> 通宇通讯"
+          }
+        ]
+      },
+      {
+        "link_name": "飞行器配套",
+        "keywords": ["飞行器", "机载", "低空飞行", "通航配套"],
+        "template": "事件 -> 低空经济主题 -> 飞行器配套 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "300581",
+            "stock_name": "晨曦航空",
+            "relation_type": "飞行器配套",
+            "relation_path": "事件 -> 低空经济主题 -> 飞行器配套 -> 晨曦航空"
+          }
+        ]
+      }
+    ],
+    "stocks": [
+      {
+        "stock_code": "002792",
+        "stock_name": "通宇通讯",
+        "relation_type": "通信基础设施",
+        "relation_path": "低空经济发展 -> 通信与连接需求上升 -> 通信设备公司受益"
+      },
+      {
+        "stock_code": "300581",
+        "stock_name": "晨曦航空",
+        "relation_type": "飞行器配套",
+        "relation_path": "低空飞行活动扩张 -> 机载系统需求提升 -> 配套公司受益"
+      }
+    ]
+  },
+  "业绩预告": {
+    "theme_name": "业绩预告",
+    "summary": "围绕盈利兑现、成长驱动与景气兑现构建财报型事件链路。",
+    "keywords": ["业绩预增", "业绩快报", "一季报", "年报", "超预期", "净利润", "订单饱满", "盈利上修"],
+    "links": [
+      {
+        "link_name": "盈利兑现",
+        "keywords": ["盈利上修", "超预期", "盈利兑现", "净利润"],
+        "template": "事件 -> 业绩预告主题 -> 盈利兑现 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "002792",
+            "stock_name": "通宇通讯",
+            "relation_type": "公司业绩弹性",
+            "relation_path": "事件 -> 业绩预告主题 -> 盈利兑现 -> 通宇通讯"
+          }
+        ]
+      },
+      {
+        "link_name": "成长驱动",
+        "keywords": ["成长", "订单兑现", "高增", "成长驱动"],
+        "template": "事件 -> 业绩预告主题 -> 成长驱动 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "300308",
+            "stock_name": "中际旭创",
+            "relation_type": "成长型业绩驱动",
+            "relation_path": "事件 -> 业绩预告主题 -> 成长驱动 -> 中际旭创"
+          }
+        ]
+      },
+      {
+        "link_name": "景气兑现",
+        "keywords": ["景气兑现", "行业景气", "财报兑现"],
+        "template": "事件 -> 业绩预告主题 -> 景气兑现 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "300274",
+            "stock_name": "阳光电源",
+            "relation_type": "景气度兑现",
+            "relation_path": "事件 -> 业绩预告主题 -> 景气兑现 -> 阳光电源"
+          }
+        ]
+      }
+    ],
+    "stocks": [
+      {
+        "stock_code": "002792",
+        "stock_name": "通宇通讯",
+        "relation_type": "公司业绩弹性",
+        "relation_path": "业绩超预期 -> 盈利上修 -> 公司估值提升"
+      },
+      {
+        "stock_code": "300308",
+        "stock_name": "中际旭创",
+        "relation_type": "成长型业绩驱动",
+        "relation_path": "订单兑现 -> 业绩高增 -> 成长股获得溢价"
+      },
+      {
+        "stock_code": "300274",
+        "stock_name": "阳光电源",
+        "relation_type": "景气度兑现",
+        "relation_path": "行业景气向上 -> 财报兑现 -> 龙头公司受益"
+      }
+    ]
+  }
+}

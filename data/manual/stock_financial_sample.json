@@ -1,0 +1,16 @@
+[
+  {"stock_code": "600760", "stock_name": "中航沈飞", "pe": 42.5, "pb": 3.2, "roe": 0.085, "net_profit_growth": 0.12, "revenue_growth": 0.15, "debt_to_asset": 0.65},
+  {"stock_code": "300581", "stock_name": "晨曦航空", "pe": 68.3, "pb": 4.1, "roe": 0.062, "net_profit_growth": 0.08, "revenue_growth": 0.11, "debt_to_asset": 0.42},
+  {"stock_code": "688543", "stock_name": "国科军工", "pe": 55.7, "pb": 3.8, "roe": 0.071, "net_profit_growth": 0.18, "revenue_growth": 0.22, "debt_to_asset": 0.38},
+  {"stock_code": "003009", "stock_name": "中天火箭", "pe": 48.2, "pb": 2.9, "roe": 0.078, "net_profit_growth": 0.14, "revenue_growth": 0.19, "debt_to_asset": 0.51},
+  {"stock_code": "688033", "stock_name": "天宜上佳", "pe": 35.6, "pb": 2.4, "roe": 0.065, "net_profit_growth": 0.09, "revenue_growth": 0.13, "debt_to_asset": 0.33},
+  {"stock_code": "300699", "stock_name": "光威复材", "pe": 38.9, "pb": 2.7, "roe": 0.092, "net_profit_growth": 0.11, "revenue_growth": 0.16, "debt_to_asset": 0.28},
+  {"stock_code": "603019", "stock_name": "中科曙光", "pe": 72.4, "pb": 4.5, "roe": 0.058, "net_profit_growth": 0.06, "revenue_growth": 0.09, "debt_to_asset": 0.55},
+  {"stock_code": "300308", "stock_name": "中际旭创", "pe": 65.1, "pb": 3.9, "roe": 0.095, "net_profit_growth": 0.22, "revenue_growth": 0.28, "debt_to_asset": 0.44},
+  {"stock_code": "002371", "stock_name": "北方华创", "pe": 58.6, "pb": 4.2, "roe": 0.072, "net_profit_growth": 0.16, "revenue_growth": 0.21, "debt_to_asset": 0.62},
+  {"stock_code": "688041", "stock_name": "海光信息", "pe": 82.3, "pb": 5.1, "roe": 0.048, "net_profit_growth": 0.05, "revenue_growth": 0.08, "debt_to_asset": 0.35},
+  {"stock_code": "300274", "stock_name": "阳光电源", "pe": 25.8, "pb": 2.1, "roe": 0.118, "net_profit_growth": 0.25, "revenue_growth": 0.32, "debt_to_asset": 0.67},
+  {"stock_code": "600438", "stock_name": "通威股份", "pe": 18.4, "pb": 1.8, "roe": 0.135, "net_profit_growth": 0.31, "revenue_growth": 0.38, "debt_to_asset": 0.72},
+  {"stock_code": "002594", "stock_name": "比亚迪", "pe": 28.7, "pb": 2.6, "roe": 0.108, "net_profit_growth": 0.19, "revenue_growth": 0.25, "debt_to_asset": 0.69},
+  {"stock_code": "002792", "stock_name": "通宇通讯", "pe": 45.2, "pb": 3.3, "roe": 0.075, "net_profit_growth": 0.13, "revenue_growth": 0.17, "debt_to_asset": 0.48}
+]

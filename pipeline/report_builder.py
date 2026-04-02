@@ -26,7 +26,8 @@ def build_weekly_report(
 
     report_path = output_dir / "report.md"
     top_events = event_df.head(config.raw["report"]["top_event_count"])
-    top_relations = relation_df.head(config.raw["report"]["top_relation_count"])
+    top_relations = relation_df.head(
+        config.raw["report"]["top_relation_count"])
     top_predictions = prediction_df.head(10)
 
     graph_lines = "\n".join(
@@ -54,24 +55,29 @@ def build_weekly_report(
 
     event_study_stats_section = "暂无事件研究统计结果。"
     if not event_study_artifacts.stats_df.empty:
-        event_study_stats_section = event_study_artifacts.stats_df.head(8).to_markdown(index=False)
+        event_study_stats_section = event_study_artifacts.stats_df.head(
+            8).to_markdown(index=False)
 
     joint_mean_car_section = "暂无联合均值CAR结果。"
     if not event_study_artifacts.joint_mean_car_df.empty:
-        joint_mean_car_section = event_study_artifacts.joint_mean_car_df.to_markdown(index=False)
+        joint_mean_car_section = event_study_artifacts.joint_mean_car_df.to_markdown(
+            index=False)
 
     chain_relation_section = "暂无产业链图谱增强结果。"
     if not industry_chain_artifacts.relation_df.empty:
         chain_relation_section = industry_chain_artifacts.relation_df.head(10)[
-            ["event_name", "theme_name", "link_name", "stock_name", "association_score", "chain_confidence", "relation_path"]
+            ["event_name", "theme_name", "link_name", "stock_name",
+                "association_score", "chain_confidence", "relation_path"]
         ].to_markdown(index=False)
 
     chain_summary_text = "暂无图谱说明。"
     if industry_chain_artifacts.summary_path.exists():
-        chain_summary_text = industry_chain_artifacts.summary_path.read_text(encoding="utf-8")
+        chain_summary_text = industry_chain_artifacts.summary_path.read_text(
+            encoding="utf-8")
 
     # 生成投资决策推理过程
-    reasoning_section = _generate_reasoning_section(final_picks, prediction_df, event_df)
+    reasoning_section = _generate_reasoning_section(
+        final_picks, prediction_df, event_df)
 
     content = f"""# 事件驱动型股市投资策略周报
 

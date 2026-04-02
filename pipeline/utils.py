@@ -211,7 +211,7 @@ def build_event_id(title: str, publish_time: datetime) -> str:
 
 def configure_matplotlib_chinese():
     """配置 matplotlib 支持中文显示。
-    
+
     根据系统可用字体自动选择合适的中文字体，优先使用系统自带中文字体，
     在 macOS 上使用 PingFang、Hiragino 等字体，最后回退到 SimHei。
     """
@@ -240,5 +240,6 @@ def configure_matplotlib_chinese():
             break
 
     if selected_font:
-        plt.rcParams['font.sans-serif'] = [selected_font] + plt.rcParams.get('font.sans-serif', [])
+        plt.rcParams['font.sans-serif'] = [selected_font] + \
+            plt.rcParams.get('font.sans-serif', [])
     plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题

@@ -42,7 +42,8 @@ def run_event_study_enhanced(
     if relation_df.empty:
         empty_detail = _build_empty_detail_df()
         empty_stats = _build_empty_stats_df()
-        empty_joint = pd.DataFrame(columns=["group_label", "day_offset", "mean_car", "sample_size", "note"])
+        empty_joint = pd.DataFrame(
+            columns=["group_label", "day_offset", "mean_car", "sample_size", "note"])
         save_dataframe(empty_detail, study_dir / "event_study_detail")
         save_dataframe(empty_stats, study_dir / "event_study_stats")
         save_dataframe(empty_joint, study_dir / "joint_mean_car")
@@ -53,7 +54,8 @@ def run_event_study_enhanced(
     benchmark_returns = _prepare_return_series(benchmark_df)
     stock_returns = _prepare_return_series(price_df)
     event_meta = event_df.set_index("event_id")[
-        ["event_name", "published_at", "sentiment_score", "subject_type", "industry_type"]
+        ["event_name", "published_at", "sentiment_score",
+            "subject_type", "industry_type"]
     ].copy()
     event_meta["published_at"] = pd.to_datetime(event_meta["published_at"])
 
@@ -65,7 +67,8 @@ def run_event_study_enhanced(
             continue
         meta = event_meta.loc[event_id]
         published_at = pd.Timestamp(meta["published_at"]).to_pydatetime()
-        stock_history = stock_returns[stock_returns["stock_code"] == relation["stock_code"]].copy()
+        stock_history = stock_returns[stock_returns["stock_code"]
+                                      == relation["stock_code"]].copy()
         common_calendar = sorted(
             set(pd.to_datetime(stock_history["trade_date"]).dt.date.tolist())
             & set(pd.to_datetime(benchmark_returns["trade_date"]).dt.date.tolist())
@@ -86,7 +89,8 @@ def run_event_study_enhanced(
             )
             continue
 
-        anchor_date = _resolve_anchor_trade_date(common_calendar, published_at, config.market_close_time)
+        anchor_date = _resolve_anchor_trade_date(
+            common_calendar, published_at, config.market_close_time)
         if anchor_date is None or anchor_date not in common_calendar:
             availability_rows.append(
                 {
@@ -102,7 +106,8 @@ def run_event_study_enhanced(
             )
             continue
 
-        market_model = _estimate_market_model(stock_history, benchmark_returns, anchor_date)
+        market_model = _estimate_market_model(
+            stock_history, benchmark_returns, anchor_date)
         event_window_df = _build_event_window(
             stock_history=stock_history,
             benchmark_returns=benchmark_returns,
@@ -132,7 +137,8 @@ def run_event_study_enhanced(
         event_window_df["stock_code"] = relation["stock_code"]
         event_window_df["stock_name"] = relation["stock_name"]
         event_window_df["anchor_trade_date"] = anchor_date.isoformat()
-        event_window_df["sentiment_group"] = "正向事件" if float(meta["sentiment_score"]) >= 0 else "负向事件"
+        event_window_df["sentiment_group"] = "正向事件" if float(
+            meta["sentiment_score"]) >= 0 else "负向事件"
         detail_rows.extend(event_window_df.to_dict(orient="records"))
         availability_rows.append(_build_availability_row(event_window_df))
 
@@ -167,7 +173,8 @@ def run_event_study_enhanced(
     joint_mean_car_df, plot_note = _build_joint_mean_car(detail_df)
     save_dataframe(joint_mean_car_df, study_dir / "joint_mean_car")
     joint_mean_car_path = study_dir / "joint_mean_car.png"
-    _render_joint_mean_car_plot(joint_mean_car_df, joint_mean_car_path, plot_note)
+    _render_joint_mean_car_plot(
+        joint_mean_car_df, joint_mean_car_path, plot_note)
 
     return EventStudyArtifacts(detail_df, stats_df, joint_mean_car_df, study_dir, joint_mean_car_path)
 
@@ -220,7 +227,8 @@ def _prepare_return_series(price_df: pd.DataFrame) -> pd.DataFrame:
 
     ordered = price_df.sort_values(["stock_code", "trade_date"]).copy()
     ordered["trade_date"] = pd.to_datetime(ordered["trade_date"])
-    ordered["return"] = ordered.groupby("stock_code")["close"].pct_change().fillna(0.0)
+    ordered["return"] = ordered.groupby(
+        "stock_code")["close"].pct_change().fillna(0.0)
     return ordered
 
 
@@ -240,10 +248,12 @@ def _estimate_market_model(stock_history: pd.DataFrame, benchmark_returns: pd.Da
     estimation_start = pd.Timestamp(anchor_date) + pd.Timedelta(days=-60)
     estimation_end = pd.Timestamp(anchor_date) + pd.Timedelta(days=-6)
     stock_window = stock_history[
-        (stock_history["trade_date"] >= estimation_start) & (stock_history["trade_date"] <= estimation_end)
+        (stock_history["trade_date"] >= estimation_start) & (
+            stock_history["trade_date"] <= estimation_end)
     ][["trade_date", "return"]]
     benchmark_window = benchmark_returns[
-        (benchmark_returns["trade_date"] >= estimation_start) & (benchmark_returns["trade_date"] <= estimation_end)
+        (benchmark_returns["trade_date"] >= estimation_start) & (
+            benchmark_returns["trade_date"] <= estimation_end)
     ][["trade_date", "return"]].rename(columns={"return": "benchmark_return"})
     merged = stock_window.merge(benchmark_window, on="trade_date", how="inner")
     if len(merged) < 15:
@@ -294,8 +304,10 @@ def _build_event_window(
             continue
 
         market_adjusted = benchmark_return
-        single_factor_expected = market_model["alpha"] + market_model["beta"] * benchmark_return
-        expected_return = market_adjusted if market_model["use_market_adjusted"] else single_factor_expected
+        single_factor_expected = market_model["alpha"] + \
+            market_model["beta"] * benchmark_return
+        expected_return = market_adjusted if market_model[
+            "use_market_adjusted"] else single_factor_expected
         abnormal_return = actual_return - expected_return
         cumulative_all += abnormal_return
         if 0 <= day_offset <= 2:
@@ -343,9 +355,12 @@ def _build_event_study_stats(detail_df: pd.DataFrame, availability_df: pd.DataFr
     stats_rows: list[dict[str, object]] = []
     for (event_id, event_name), availability_group in availability_df.groupby(["event_id", "event_name"]):
         event_detail_df = detail_df[detail_df["event_id"] == event_id].copy()
-        ar_1d = event_detail_df[event_detail_df["day_offset"] == 1]["abnormal_return"]
-        car_0_2 = event_detail_df[event_detail_df["day_offset"] == 2]["cumulative_abnormal_return_0_2"]
-        car_0_4 = event_detail_df[event_detail_df["day_offset"] == 4]["cumulative_abnormal_return_0_4"]
+        ar_1d = event_detail_df[event_detail_df["day_offset"]
+                                == 1]["abnormal_return"]
+        car_0_2 = event_detail_df[event_detail_df["day_offset"]
+                                  == 2]["cumulative_abnormal_return_0_2"]
+        car_0_4 = event_detail_df[event_detail_df["day_offset"]
+                                  == 4]["cumulative_abnormal_return_0_4"]
         complete_0_4_count = int(availability_group["has_car_0_4"].sum())
         partial_count = int(len(availability_group) - complete_0_4_count)
         status_note = "窗口完整"

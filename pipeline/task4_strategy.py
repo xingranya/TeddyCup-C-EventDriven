@@ -13,7 +13,8 @@ def _compute_momentum(stock_code: str, price_df: pd.DataFrame, asof_date, n_days
     """计算股票近n日涨幅。"""
     if price_df is None or price_df.empty:
         return 0.0
-    stock_prices = price_df[price_df['stock_code'] == stock_code].sort_values('trade_date')
+    stock_prices = price_df[price_df['stock_code']
+                            == stock_code].sort_values('trade_date')
     # 取asof_date之前的数据
     stock_prices = stock_prices[stock_prices['trade_date'] <= str(asof_date)]
     if len(stock_prices) < n_days + 1:
@@ -37,13 +38,15 @@ def run_strategy_construction(
     """生成周度投资决策。"""
 
     merged = prediction_df.merge(
-        stock_df[["stock_code", "stock_name", "listed_date", "is_st", "avg_turnover_million"]],
+        stock_df[["stock_code", "stock_name", "listed_date",
+                  "is_st", "avg_turnover_million"]],
         on=["stock_code", "stock_name"],
         how="left",
     )
     if financial_df is not None and not financial_df.empty:
         merged = merged.merge(
-            financial_df[["stock_code", "pe", "pb", "roe", "net_profit_growth"]],
+            financial_df[["stock_code", "pe",
+                          "pb", "roe", "net_profit_growth"]],
             on="stock_code",
             how="left",
         )
@@ -52,33 +55,42 @@ def run_strategy_construction(
             merged[col] = None
 
     merged["listed_date"] = pd.to_datetime(merged["listed_date"])
-    merged["listing_days"] = (pd.Timestamp(asof_date) - merged["listed_date"]).dt.days
+    merged["listing_days"] = (pd.Timestamp(
+        asof_date) - merged["listed_date"]).dt.days
     merged["passes_filter"] = merged.apply(
-        lambda row: pass_basic_filter(row, config) and pass_fundamental_filter(row),
+        lambda row: pass_basic_filter(
+            row, config) and pass_fundamental_filter(row),
         axis=1,
     )
 
     tradable = merged[merged["passes_filter"]].copy()
     tradable["can_trade"] = tradable.apply(
-        lambda row: is_tradeable(row["stock_code"], asof_date, trading_calendar, suspend_resume_df),
+        lambda row: is_tradeable(
+            row["stock_code"], asof_date, trading_calendar, suspend_resume_df),
         axis=1,
     )
     tradable = tradable[tradable["can_trade"]].copy()
 
     # 计算动量因子并融入排序得分
     tradable["momentum_5d"] = tradable.apply(
-        lambda row: _compute_momentum(row["stock_code"], price_df, asof_date, n_days=5),
+        lambda row: _compute_momentum(
+            row["stock_code"], price_df, asof_date, n_days=5),
         axis=1,
     )
     # momentum_score 使用 logistic 归一化，默认 0.5
-    tradable["momentum_score"] = tradable["momentum_5d"].apply(lambda x: logistic(x * 10) if x != 0 else 0.5)
+    tradable["momentum_score"] = tradable["momentum_5d"].apply(
+        lambda x: logistic(x * 10) if x != 0 else 0.5)
     # 最终得分：85% prediction_score + 15% momentum_score
-    tradable["final_score"] = 0.85 * tradable["prediction_score"] + 0.15 * tradable["momentum_score"]
+    tradable["final_score"] = 0.85 * tradable["prediction_score"] + \
+        0.15 * tradable["momentum_score"]
 
-    tradable = tradable.sort_values(["final_score", "pseudoconfidence"], ascending=[False, False]).reset_index(drop=True)
-    tradable = tradable.drop_duplicates(subset=["stock_code"], keep="first").reset_index(drop=True)
+    tradable = tradable.sort_values(["final_score", "pseudoconfidence"], ascending=[
+                                    False, False]).reset_index(drop=True)
+    tradable = tradable.drop_duplicates(
+        subset=["stock_code"], keep="first").reset_index(drop=True)
 
-    selected = tradable[tradable["final_score"] >= config.positive_score_threshold].head(config.max_positions).copy()
+    selected = tradable[tradable["final_score"] >= config.positive_score_threshold].head(
+        config.max_positions).copy()
     fallback_used = False
     if selected.empty:
         fallback_used = True
@@ -90,7 +102,8 @@ def run_strategy_construction(
     if not final_picks.empty:
         min_score_threshold = -0.01  # 可配置
         if final_picks["prediction_score"].max() < min_score_threshold:
-            print(f"[STRATEGY] 所有候选标的预期收益为负(max={final_picks['prediction_score'].max():.4f})，本周空仓")
+            print(
+                f"[STRATEGY] 所有候选标的预期收益为负(max={final_picks['prediction_score'].max():.4f})，本周空仓")
             final_picks = final_picks.iloc[0:0]  # 清空但保留列结构
 
     if final_picks.empty:
@@ -215,7 +228,8 @@ def week_last_trading_date(trading_calendar: list[date], asof_date: date) -> dat
 
     monday = asof_date - timedelta(days=asof_date.weekday())
     week_end = monday + timedelta(days=4)
-    candidates = [trade_date for trade_date in trading_calendar if monday <= trade_date <= week_end]
+    candidates = [
+        trade_date for trade_date in trading_calendar if monday <= trade_date <= week_end]
     if not candidates:
         return None
     return max(candidates)
@@ -238,7 +252,8 @@ def build_fallback_pool(tradable: pd.DataFrame, config: AppConfig) -> pd.DataFra
         + 0.35 * fallback["pseudoconfidence"]
         + 0.25 * (1 - fallback["risk_penalty"])
     )
-    fallback = fallback.sort_values(["stability_score", "final_score"], ascending=[False, False]).head(config.max_positions)
+    fallback = fallback.sort_values(["stability_score", "final_score"], ascending=[
+                                    False, False]).head(config.max_positions)
     return fallback
 
 
@@ -248,13 +263,15 @@ def allocate_positions(selected: pd.DataFrame, config: AppConfig) -> pd.DataFram
     if selected.empty:
         return pd.DataFrame(columns=["event_name", "stock_code", "capital_ratio", "rank", "stock_name", "prediction_score"])
 
-    picks = selected[["event_name", "stock_code", "stock_name", "final_score", "prediction_score"]].copy()
+    picks = selected[["event_name", "stock_code",
+                      "stock_name", "final_score", "prediction_score"]].copy()
     scores = picks["final_score"].clip(lower=0.0001)
     picks["capital_ratio"] = scores / scores.sum()
 
     # 置信度加权：如果最高分标的的 prediction_score > 第二名的 1.5 倍，给最高分额外 5% 权重
     if len(picks) > 1:
-        sorted_scores = picks["prediction_score"].sort_values(ascending=False).reset_index(drop=True)
+        sorted_scores = picks["prediction_score"].sort_values(
+            ascending=False).reset_index(drop=True)
         if sorted_scores.iloc[0] > sorted_scores.iloc[1] * 1.5:
             # 找到最高分标的的索引
             top_idx = picks["prediction_score"].idxmax()
@@ -264,25 +281,32 @@ def allocate_positions(selected: pd.DataFrame, config: AppConfig) -> pd.DataFram
                 total_other = picks.loc[other_indices, "capital_ratio"].sum()
                 if total_other > 0:
                     # 从其他标的扣除 5%，加到最高分
-                    picks.loc[other_indices, "capital_ratio"] *= (total_other - 0.05) / total_other
+                    picks.loc[other_indices,
+                              "capital_ratio"] *= (total_other - 0.05) / total_other
                     picks.loc[top_idx, "capital_ratio"] += 0.05
 
     if len(picks) > 1:
         # 仓位下限从 20% 调整为 15%，上限保持 50%
         position_floor = getattr(config, "position_floor_new", 0.15)
-        picks["capital_ratio"] = picks["capital_ratio"].clip(lower=position_floor, upper=config.position_cap)
-        picks["capital_ratio"] = picks["capital_ratio"] / picks["capital_ratio"].sum()
-        picks["capital_ratio"] = picks["capital_ratio"].clip(lower=position_floor, upper=config.position_cap)
-        picks["capital_ratio"] = picks["capital_ratio"] / picks["capital_ratio"].sum()
+        picks["capital_ratio"] = picks["capital_ratio"].clip(
+            lower=position_floor, upper=config.position_cap)
+        picks["capital_ratio"] = picks["capital_ratio"] / \
+            picks["capital_ratio"].sum()
+        picks["capital_ratio"] = picks["capital_ratio"].clip(
+            lower=position_floor, upper=config.position_cap)
+        picks["capital_ratio"] = picks["capital_ratio"] / \
+            picks["capital_ratio"].sum()
     else:
         picks["capital_ratio"] = 1.0
 
-    picks = picks.sort_values("capital_ratio", ascending=False).reset_index(drop=True)
+    picks = picks.sort_values(
+        "capital_ratio", ascending=False).reset_index(drop=True)
     picks["rank"] = range(1, len(picks) + 1)
     picks["capital_ratio"] = picks["capital_ratio"].round(4)
     diff = round(1 - picks["capital_ratio"].sum(), 4)
     if not picks.empty and diff != 0:
-        picks.loc[0, "capital_ratio"] = round(picks.loc[0, "capital_ratio"] + diff, 4)
+        picks.loc[0, "capital_ratio"] = round(
+            picks.loc[0, "capital_ratio"] + diff, 4)
     return picks[["event_name", "stock_code", "capital_ratio", "rank", "stock_name", "prediction_score"]]
 
 

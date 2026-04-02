@@ -45,10 +45,13 @@ def run_fetch_pipeline(context: RunContext, config: AppConfig) -> FetchArtifacts
     """采集周度运行所需的真实基础数据。"""
 
     start_date = context.asof_date - timedelta(days=180)
-    trading_calendar = fetch_trading_calendar(start_date, context.asof_date + timedelta(days=20), config)
-    all_stock_df = fetch_stock_universe(context.project_root, context.asof_date, config)
+    trading_calendar = fetch_trading_calendar(
+        start_date, context.asof_date + timedelta(days=20), config)
+    all_stock_df = fetch_stock_universe(
+        context.project_root, context.asof_date, config)
     news_df = fetch_news(context, config, all_stock_df)
-    stock_df = narrow_stock_universe(context.project_root, all_stock_df, news_df)
+    stock_df = narrow_stock_universe(
+        context.project_root, all_stock_df, news_df)
     price_df = fetch_price_history(
         stock_codes=stock_df["stock_code"].tolist(),
         start_date=start_date,
@@ -65,10 +68,13 @@ def run_fetch_pipeline(context: RunContext, config: AppConfig) -> FetchArtifacts
         price_df=price_df,
     )
 
-    save_dataframe(news_df, context.raw_dir / f"news_{context.asof_date.isoformat()}")
+    save_dataframe(news_df, context.raw_dir /
+                   f"news_{context.asof_date.isoformat()}")
     save_dataframe(stock_df, context.raw_dir / "stock_universe")
-    save_dataframe(price_df, context.raw_dir / f"prices_{context.asof_date.isoformat()}")
-    save_dataframe(benchmark_df, context.raw_dir / f"benchmark_{context.asof_date.isoformat()}")
+    save_dataframe(price_df, context.raw_dir /
+                   f"prices_{context.asof_date.isoformat()}")
+    save_dataframe(benchmark_df, context.raw_dir /
+                   f"benchmark_{context.asof_date.isoformat()}")
     save_dataframe(
         pd.DataFrame({"trade_date": pd.to_datetime(trading_calendar)}),
         context.raw_dir / f"trading_calendar_{context.asof_date.isoformat()}",
@@ -125,7 +131,8 @@ def fetch_trading_calendar(start_date: date, end_date: date, config: AppConfig) 
             is_open="1",
         )
         if calendar_df is not None and not calendar_df.empty:
-            calendar_df["trade_date"] = pd.to_datetime(calendar_df["cal_date"], format="%Y%m%d").dt.date
+            calendar_df["trade_date"] = pd.to_datetime(
+                calendar_df["cal_date"], format="%Y%m%d").dt.date
             return sorted(calendar_df["trade_date"].unique().tolist())
     except Exception as e1:
         print(f"[WARN] tushare trading calendar failed: {e1}")
@@ -135,7 +142,8 @@ def fetch_trading_calendar(start_date: date, end_date: date, config: AppConfig) 
         try:
             calendar_df = ak.tool_trade_date_hist_sina()
             if calendar_df is not None and not calendar_df.empty:
-                calendar_df["trade_date"] = pd.to_datetime(calendar_df["trade_date"]).dt.date
+                calendar_df["trade_date"] = pd.to_datetime(
+                    calendar_df["trade_date"]).dt.date
                 calendar_df = calendar_df[
                     (calendar_df["trade_date"] >= start_date)
                     & (calendar_df["trade_date"] <= end_date)
@@ -151,7 +159,8 @@ def fetch_trading_calendar(start_date: date, end_date: date, config: AppConfig) 
         _search_roots = [Path.cwd(), Path(__file__).parent.parent]
         cache_files: list[str] = []
         for _root in _search_roots:
-            _pattern = str(_root / "data" / "raw" / "*" / "trading_calendar_*.csv")
+            _pattern = str(_root / "data" / "raw" /
+                           "*" / "trading_calendar_*.csv")
             _found = sorted(_glob.glob(_pattern))
             if _found:
                 cache_files = _found
@@ -167,7 +176,8 @@ def fetch_trading_calendar(start_date: date, end_date: date, config: AppConfig) 
                     continue
             if frames:
                 combined = pd.concat(frames, ignore_index=True)
-                combined["trade_date"] = pd.to_datetime(combined["trade_date"]).dt.date
+                combined["trade_date"] = pd.to_datetime(
+                    combined["trade_date"]).dt.date
                 combined = combined[
                     (combined["trade_date"] >= start_date)
                     & (combined["trade_date"] <= end_date)
@@ -228,8 +238,10 @@ def fetch_news(context: RunContext, config: AppConfig, stock_df: pd.DataFrame) -
                     continue
                 if not (lookback_start <= published_at.date() <= context.asof_date):
                     continue
-                title = str(record.get("title") or record.get("标题") or "").strip()
-                content = str(record.get("content") or record.get("正文") or title).strip()
+                title = str(record.get("title")
+                            or record.get("标题") or "").strip()
+                content = str(record.get("content")
+                              or record.get("正文") or title).strip()
                 if not title or not content:
                     continue
                 rows.append(
@@ -240,7 +252,8 @@ def fetch_news(context: RunContext, config: AppConfig, stock_df: pd.DataFrame) -
                         source="qstock",
                         source_type="industry",
                         source_name="qstock.news_data",
-                        source_url=str(record.get("url") or record.get("链接") or ""),
+                        source_url=str(record.get("url")
+                                       or record.get("链接") or ""),
                         raw_id=str(record.get("id") or ""),
                         stock_names=stock_names,
                         collected_at=collected_at,
@@ -275,9 +288,11 @@ def fetch_news(context: RunContext, config: AppConfig, stock_df: pd.DataFrame) -
             "3. 检查 config.yaml 中 events.import_paths 配置是否正确"
         )
 
-    news_df = pd.DataFrame(rows).drop_duplicates(subset=["content_hash"]).copy()
+    news_df = pd.DataFrame(rows).drop_duplicates(
+        subset=["content_hash"]).copy()
     news_df["published_at"] = pd.to_datetime(news_df["published_at"])
-    news_df = news_df.sort_values(["published_at", "source_name", "raw_id"]).reset_index(drop=True)
+    news_df = news_df.sort_values(
+        ["published_at", "source_name", "raw_id"]).reset_index(drop=True)
     news_df["news_id"] = news_df["content_hash"].str[:12]
     return news_df[
         [
@@ -324,8 +339,10 @@ def load_imported_event_records(
             continue
 
         for raw_record in raw_records:
-            title = str(raw_record.get("title") or raw_record.get("标题") or "").strip()
-            content = str(raw_record.get("content") or raw_record.get("正文") or title).strip()
+            title = str(raw_record.get("title")
+                        or raw_record.get("标题") or "").strip()
+            content = str(raw_record.get("content")
+                          or raw_record.get("正文") or title).strip()
             published_value = (
                 raw_record.get("published_at")
                 or raw_record.get("publish_time")
@@ -343,11 +360,15 @@ def load_imported_event_records(
                     title=title,
                     content=content,
                     published_at=published_at,
-                    source=source_type if source_type in {"policy", "announcement", "industry", "macro"} else "import",
+                    source=source_type if source_type in {
+                        "policy", "announcement", "industry", "macro"} else "import",
                     source_type=source_type,
-                    source_name=str(raw_record.get("source_name") or path.name),
-                    source_url=str(raw_record.get("source_url") or raw_record.get("url") or ""),
-                    raw_id=str(raw_record.get("raw_id") or raw_record.get("id") or f"{path.stem}-{len(rows) + 1}"),
+                    source_name=str(raw_record.get(
+                        "source_name") or path.name),
+                    source_url=str(raw_record.get("source_url")
+                                   or raw_record.get("url") or ""),
+                    raw_id=str(raw_record.get("raw_id") or raw_record.get(
+                        "id") or f"{path.stem}-{len(rows) + 1}"),
                     stock_names=stock_names,
                     collected_at=collected_at,
                 )
@@ -369,7 +390,8 @@ def _build_event_record(
 ) -> dict[str, Any]:
     """构造统一事件记录。"""
 
-    entity_candidates = extract_entity_candidates(f"{title} {content}", stock_names)
+    entity_candidates = extract_entity_candidates(
+        f"{title} {content}", stock_names)
     content_hash = hashlib.md5(
         f"{title}|{content}|{published_at.isoformat()}|{source_url}".encode("utf-8")
     ).hexdigest()
@@ -558,7 +580,8 @@ def fetch_stock_universe(project_root: Path, asof_date: date, config: AppConfig)
             )
 
             stock_df = basic_df.merge(company_df, on="ts_code", how="left")
-            stock_df["stock_code"] = stock_df["symbol"].astype(str).str.zfill(6)
+            stock_df["stock_code"] = stock_df["symbol"].astype(
+                str).str.zfill(6)
             stock_df["stock_name"] = stock_df["name"].astype(str)
             stock_df["industry"] = stock_df["industry"].fillna("未知行业")
             stock_df["concept_tags"] = ""
@@ -568,10 +591,13 @@ def fetch_stock_universe(project_root: Path, asof_date: date, config: AppConfig)
                 .fillna(stock_df["industry"])
                 .astype(str)
             )
-            stock_df["listed_date"] = pd.to_datetime(stock_df["list_date"], format="%Y%m%d", errors="coerce")
-            stock_df["is_st"] = stock_df["stock_name"].str.contains("ST", case=False, na=False)
+            stock_df["listed_date"] = pd.to_datetime(
+                stock_df["list_date"], format="%Y%m%d", errors="coerce")
+            stock_df["is_st"] = stock_df["stock_name"].str.contains(
+                "ST", case=False, na=False)
             stock_df = stock_df[stock_df["listed_date"].notna()].copy()
-            stock_df = stock_df[stock_df["listed_date"].dt.date <= asof_date].copy()
+            stock_df = stock_df[stock_df["listed_date"].dt.date <=
+                                asof_date].copy()
     except Exception:
         stock_df = pd.DataFrame()
 
@@ -580,20 +606,27 @@ def fetch_stock_universe(project_root: Path, asof_date: date, config: AppConfig)
         if not manual_path.exists():
             raise RuntimeError("未获取到股票池数据，且本地无可用候选池缓存。")
         stock_df = pd.read_csv(manual_path)
-        stock_df["stock_code"] = stock_df["stock_code"].astype(str).str.zfill(6)
+        stock_df["stock_code"] = stock_df["stock_code"].astype(
+            str).str.zfill(6)
         stock_df["stock_name"] = stock_df["stock_name"].astype(str)
         stock_df["industry"] = stock_df["industry"].fillna("未知行业")
         stock_df["concept_tags"] = stock_df["concept_tags"].fillna("")
-        stock_df["main_business"] = stock_df["main_business"].fillna(stock_df["industry"])
-        stock_df["listed_date"] = pd.to_datetime(stock_df["listed_date"], errors="coerce")
+        stock_df["main_business"] = stock_df["main_business"].fillna(
+            stock_df["industry"])
+        stock_df["listed_date"] = pd.to_datetime(
+            stock_df["listed_date"], errors="coerce")
         stock_df["is_st"] = stock_df["is_st"].astype(bool)
 
-    whitelist_codes = read_code_list(project_root / config.stock_whitelist_path) if config.stock_whitelist_path else set()
-    blacklist_codes = read_code_list(project_root / config.stock_blacklist_path) if config.stock_blacklist_path else set()
+    whitelist_codes = read_code_list(
+        project_root / config.stock_whitelist_path) if config.stock_whitelist_path else set()
+    blacklist_codes = read_code_list(
+        project_root / config.stock_blacklist_path) if config.stock_blacklist_path else set()
     if whitelist_codes:
-        stock_df = stock_df[stock_df["stock_code"].isin(whitelist_codes)].copy()
+        stock_df = stock_df[stock_df["stock_code"].isin(
+            whitelist_codes)].copy()
     if blacklist_codes:
-        stock_df = stock_df[~stock_df["stock_code"].isin(blacklist_codes)].copy()
+        stock_df = stock_df[~stock_df["stock_code"].isin(
+            blacklist_codes)].copy()
 
     return stock_df[
         [
@@ -634,10 +667,12 @@ def fetch_price_history(
         if daily_df is None or daily_df.empty:
             continue
         daily_df["stock_code"] = stock_code
-        daily_df["trade_date"] = pd.to_datetime(daily_df["trade_date"], format="%Y%m%d")
+        daily_df["trade_date"] = pd.to_datetime(
+            daily_df["trade_date"], format="%Y%m%d")
         frames.append(
             daily_df[
-                ["stock_code", "trade_date", "open", "high", "low", "close", "vol", "amount", "pct_chg"]
+                ["stock_code", "trade_date", "open", "high",
+                    "low", "close", "vol", "amount", "pct_chg"]
             ].rename(columns={"vol": "volume"})
         )
 
@@ -652,18 +687,22 @@ def fetch_price_history(
 def narrow_stock_universe(project_root: Path, stock_df: pd.DataFrame, news_df: pd.DataFrame) -> pd.DataFrame:
     """根据事件文本与产业映射收缩候选股票池。"""
 
-    relation_map = load_json(project_root / "data/manual/industry_relation_map.json")
-    combined_text = normalize_text(" ".join((news_df["title"] + " " + news_df["content"]).tolist()))
+    relation_map = load_json(
+        project_root / "data/manual/industry_relation_map.json")
+    combined_text = normalize_text(
+        " ".join((news_df["title"] + " " + news_df["content"]).tolist()))
     selected_codes: set[str] = set()
 
     for entities in news_df["entity_candidates"].fillna("").astype(str):
         for stock_name in filter(None, entities.split("、")):
             matched_df = stock_df[stock_df["stock_name"] == stock_name]
             if not matched_df.empty:
-                selected_codes.update(matched_df["stock_code"].astype(str).tolist())
+                selected_codes.update(
+                    matched_df["stock_code"].astype(str).tolist())
 
     for payload in relation_map.values():
-        keywords = [normalize_text(keyword) for keyword in payload.get("keywords", [])]
+        keywords = [normalize_text(keyword)
+                    for keyword in payload.get("keywords", [])]
         if any(keyword and keyword in combined_text for keyword in keywords):
             selected_codes.update(
                 str(item["stock_code"]).zfill(6)
@@ -675,20 +714,25 @@ def narrow_stock_universe(project_root: Path, stock_df: pd.DataFrame, news_df: p
             stock_df.head(50)["stock_code"].astype(str).tolist()
         )
 
-    narrowed_df = stock_df[stock_df["stock_code"].astype(str).isin(selected_codes)].copy()
+    narrowed_df = stock_df[stock_df["stock_code"].astype(
+        str).isin(selected_codes)].copy()
     manual_path = project_root / "data/manual/stock_universe.csv"
     if manual_path.exists():
         manual_df = pd.read_csv(manual_path)
-        manual_df["stock_code"] = manual_df["stock_code"].astype(str).str.zfill(6)
+        manual_df["stock_code"] = manual_df["stock_code"].astype(
+            str).str.zfill(6)
         narrowed_df = narrowed_df.merge(
             manual_df[["stock_code", "concept_tags", "main_business"]],
             on="stock_code",
             how="left",
             suffixes=("", "_manual"),
         )
-        narrowed_df["concept_tags"] = narrowed_df["concept_tags_manual"].fillna(narrowed_df["concept_tags"]).fillna("")
-        narrowed_df["main_business"] = narrowed_df["main_business_manual"].fillna(narrowed_df["main_business"]).fillna(narrowed_df["industry"])
-        narrowed_df = narrowed_df.drop(columns=["concept_tags_manual", "main_business_manual"])
+        narrowed_df["concept_tags"] = narrowed_df["concept_tags_manual"].fillna(
+            narrowed_df["concept_tags"]).fillna("")
+        narrowed_df["main_business"] = narrowed_df["main_business_manual"].fillna(
+            narrowed_df["main_business"]).fillna(narrowed_df["industry"])
+        narrowed_df = narrowed_df.drop(
+            columns=["concept_tags_manual", "main_business_manual"])
 
     return narrowed_df.sort_values("stock_code").reset_index(drop=True)
 
@@ -696,7 +740,8 @@ def narrow_stock_universe(project_root: Path, stock_df: pd.DataFrame, news_df: p
 def attach_liquidity_metrics(stock_df: pd.DataFrame, price_df: pd.DataFrame, asof_date: date) -> pd.DataFrame:
     """基于真实行情补充流动性指标。"""
 
-    history_df = price_df[pd.to_datetime(price_df["trade_date"]).dt.date <= asof_date].copy()
+    history_df = price_df[pd.to_datetime(
+        price_df["trade_date"]).dt.date <= asof_date].copy()
     trailing_df = history_df.groupby("stock_code").tail(20).copy()
     liquidity_df = (
         trailing_df.groupby("stock_code")["amount"]
@@ -711,7 +756,8 @@ def attach_liquidity_metrics(stock_df: pd.DataFrame, price_df: pd.DataFrame, aso
         on="stock_code",
         how="left",
     )
-    enriched_df["avg_turnover_million"] = enriched_df["avg_turnover_million"].fillna(0.0)
+    enriched_df["avg_turnover_million"] = enriched_df["avg_turnover_million"].fillna(
+        0.0)
     return enriched_df
 
 
@@ -733,9 +779,11 @@ def fetch_benchmark_history(
         )
         if benchmark_df is not None and not benchmark_df.empty:
             benchmark_df["stock_code"] = benchmark_code
-            benchmark_df["trade_date"] = pd.to_datetime(benchmark_df["trade_date"], format="%Y%m%d")
+            benchmark_df["trade_date"] = pd.to_datetime(
+                benchmark_df["trade_date"], format="%Y%m%d")
             return benchmark_df[
-                ["stock_code", "trade_date", "open", "high", "low", "close", "vol", "amount", "pct_chg"]
+                ["stock_code", "trade_date", "open", "high",
+                    "low", "close", "vol", "amount", "pct_chg"]
             ].rename(columns={"vol": "volume"}).sort_values("trade_date").reset_index(drop=True)
     except Exception:
         pass
@@ -774,21 +822,26 @@ def fetch_financial_data(
     daily_basic_df = pd.DataFrame()
     try:
         pro = require_tushare_client(config)
-        latest_trade_date = max(trade_date for trade_date in trading_calendar if trade_date <= context.asof_date)
+        latest_trade_date = max(
+            trade_date for trade_date in trading_calendar if trade_date <= context.asof_date)
         daily_basic_df = pro.daily_basic(
             trade_date=latest_trade_date.strftime("%Y%m%d"),
             fields="ts_code,trade_date,pe,pb,turnover_rate",
         )
         if daily_basic_df is not None and not daily_basic_df.empty:
-            daily_basic_df["stock_code"] = daily_basic_df["ts_code"].astype(str).str.split(".").str[0].str.zfill(6)
-            daily_basic_df["snapshot_trade_date"] = pd.to_datetime(daily_basic_df["trade_date"], format="%Y%m%d")
+            daily_basic_df["stock_code"] = daily_basic_df["ts_code"].astype(
+                str).str.split(".").str[0].str.zfill(6)
+            daily_basic_df["snapshot_trade_date"] = pd.to_datetime(
+                daily_basic_df["trade_date"], format="%Y%m%d")
             daily_basic_df = daily_basic_df[
-                daily_basic_df["stock_code"].isin({str(code).zfill(6) for code in stock_codes})
+                daily_basic_df["stock_code"].isin(
+                    {str(code).zfill(6) for code in stock_codes})
             ].copy()
             for stock_code in sorted(daily_basic_df["stock_code"].unique().tolist()):
                 ts_code = to_tushare_code(stock_code)
                 indicator_df = pro.fina_indicator(ts_code=ts_code)
-                latest_row = select_disclosed_indicator_row(indicator_df, context.asof_date)
+                latest_row = select_disclosed_indicator_row(
+                    indicator_df, context.asof_date)
                 if latest_row is None:
                     rows.append({"stock_code": stock_code})
                     continue
@@ -819,10 +872,12 @@ def fetch_financial_data(
         return fetch_financial_data_from_public_sources(stock_codes, context)
 
     indicator_snapshot_df = pd.DataFrame(rows)
-    financial_df = daily_basic_df.merge(indicator_snapshot_df, on="stock_code", how="left")
+    financial_df = daily_basic_df.merge(
+        indicator_snapshot_df, on="stock_code", how="left")
     financial_df["pe"] = pd.to_numeric(financial_df["pe"], errors="coerce")
     financial_df["pb"] = pd.to_numeric(financial_df["pb"], errors="coerce")
-    financial_df["turnover_rate"] = pd.to_numeric(financial_df["turnover_rate"], errors="coerce")
+    financial_df["turnover_rate"] = pd.to_numeric(
+        financial_df["turnover_rate"], errors="coerce")
     return financial_df[
         [
             "stock_code",
@@ -846,12 +901,14 @@ def select_disclosed_indicator_row(indicator_df: pd.DataFrame | None, asof_date:
     if indicator_df is None or indicator_df.empty:
         return None
     working_df = indicator_df.copy()
-    working_df["ann_date"] = pd.to_datetime(working_df["ann_date"], format="%Y%m%d", errors="coerce")
+    working_df["ann_date"] = pd.to_datetime(
+        working_df["ann_date"], format="%Y%m%d", errors="coerce")
     working_df = working_df[working_df["ann_date"].notna()].copy()
     working_df = working_df[working_df["ann_date"].dt.date <= asof_date].copy()
     if working_df.empty:
         return None
-    working_df = working_df.sort_values(["ann_date", "end_date"], ascending=[False, False])
+    working_df = working_df.sort_values(
+        ["ann_date", "end_date"], ascending=[False, False])
     return working_df.iloc[0]
 
 
@@ -869,15 +926,19 @@ def fetch_financial_data_from_public_sources(stock_codes: list[str], context: Ru
         except Exception:
             abstract_df = pd.DataFrame()
         if abstract_df is None or abstract_df.empty:
-            rows.append(build_empty_financial_snapshot_row(stock_code, context.asof_date))
+            rows.append(build_empty_financial_snapshot_row(
+                stock_code, context.asof_date))
             continue
 
         abstract_df = abstract_df.copy()
-        abstract_df["报告期"] = pd.to_datetime(abstract_df["报告期"], errors="coerce")
+        abstract_df["报告期"] = pd.to_datetime(
+            abstract_df["报告期"], errors="coerce")
         abstract_df = abstract_df[abstract_df["报告期"].notna()].copy()
-        abstract_df = abstract_df[abstract_df["报告期"].dt.date <= allowed_period].copy()
+        abstract_df = abstract_df[abstract_df["报告期"].dt.date <=
+                                  allowed_period].copy()
         if abstract_df.empty:
-            rows.append(build_empty_financial_snapshot_row(stock_code, context.asof_date))
+            rows.append(build_empty_financial_snapshot_row(
+                stock_code, context.asof_date))
             continue
         latest_row = abstract_df.sort_values("报告期", ascending=False).iloc[0]
         rows.append(
@@ -913,7 +974,8 @@ def fetch_financial_data_from_public_sources(stock_codes: list[str], context: Ru
         if column not in financial_df.columns:
             financial_df[column] = None
     for column in ["pe", "pb", "turnover_rate", "roe", "net_profit_growth", "revenue_growth", "debt_to_asset"]:
-        financial_df[column] = pd.to_numeric(financial_df[column], errors="coerce")
+        financial_df[column] = pd.to_numeric(
+            financial_df[column], errors="coerce")
     return financial_df[
         [
             "stock_code",
@@ -954,7 +1016,8 @@ def build_proxy_benchmark_from_prices(price_df: pd.DataFrame, benchmark_code: st
 
     ordered_df = price_df.sort_values(["stock_code", "trade_date"]).copy()
     ordered_df["trade_date"] = pd.to_datetime(ordered_df["trade_date"])
-    ordered_df["return"] = ordered_df.groupby("stock_code")["close"].pct_change()
+    ordered_df["return"] = ordered_df.groupby(
+        "stock_code")["close"].pct_change()
     market_df = (
         ordered_df.groupby("trade_date")
         .agg(
@@ -983,7 +1046,8 @@ def build_proxy_benchmark_from_prices(price_df: pd.DataFrame, benchmark_code: st
     market_df["pct_chg"] = (market_df["market_return"] * 100).round(4)
     market_df["stock_code"] = benchmark_code
     return market_df[
-        ["stock_code", "trade_date", "open", "high", "low", "close", "volume", "amount", "pct_chg"]
+        ["stock_code", "trade_date", "open", "high",
+            "low", "close", "volume", "amount", "pct_chg"]
     ].reset_index(drop=True)
 
 
@@ -1053,7 +1117,8 @@ def fetch_suspend_resume_data(
                     end_date=end_date,
                 )
             except TypeError:
-                suspend_df = pro.suspend(ts_code=ts_code, start_date=start_date)
+                suspend_df = pro.suspend(
+                    ts_code=ts_code, start_date=start_date)
             except Exception:
                 suspend_df = None
             if suspend_df is None or suspend_df.empty:

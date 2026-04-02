@@ -22,7 +22,8 @@ def run_backtest(project_root: Path, start_value: str | date, end_value: str | d
     start_date = parse_date(start_value)
     end_date = parse_date(end_value)
     config = load_config(project_root)
-    trading_calendar = fetch_trading_calendar(start_date - timedelta(days=7), end_date + timedelta(days=7), config)
+    trading_calendar = fetch_trading_calendar(
+        start_date - timedelta(days=7), end_date + timedelta(days=7), config)
     results: list[dict] = []
     joint_mean_car_frames: list[pd.DataFrame] = []
     event_study_stats_frames: list[pd.DataFrame] = []
@@ -44,26 +45,33 @@ def run_backtest(project_root: Path, start_value: str | date, end_value: str | d
             stats_df = artifacts.event_study_artifacts.stats_df.copy()
             stats_df["week_monday"] = monday.isoformat()
             event_study_stats_frames.append(stats_df)
-        buy_date = next_trading_date(trading_calendar, monday, target_weekday=1)
+        buy_date = next_trading_date(
+            trading_calendar, monday, target_weekday=1)
         sell_date = week_last_trading_date(trading_calendar, monday)
-        week_prices = pd.DataFrame(columns=["stock_code", "trade_date", "open", "close"])
+        week_prices = pd.DataFrame(
+            columns=["stock_code", "trade_date", "open", "close"])
         if buy_date is not None and sell_date is not None and not artifacts.final_picks.empty:
             week_prices = fetch_price_history(
-                stock_codes=artifacts.final_picks["stock_code"].astype(str).tolist(),
+                stock_codes=artifacts.final_picks["stock_code"].astype(
+                    str).tolist(),
                 start_date=buy_date,
                 end_date=sell_date,
                 config=config,
                 trading_calendar=trading_calendar,
             )
-            week_prices["trade_date"] = pd.to_datetime(week_prices["trade_date"]).dt.date
+            week_prices["trade_date"] = pd.to_datetime(
+                week_prices["trade_date"]).dt.date
         week_return = 0.0
         trade_rows = []
 
         for _, pick in artifacts.final_picks.iterrows():
-            pick_code = str(pick["stock_code"]).zfill(6) if str(pick["stock_code"]).isdigit() else str(pick["stock_code"])
+            pick_code = str(pick["stock_code"]).zfill(6) if str(
+                pick["stock_code"]).isdigit() else str(pick["stock_code"])
             stock_quotes = week_prices[week_prices["stock_code"] == pick_code]
-            buy_row = stock_quotes[stock_quotes["trade_date"] >= buy_date].sort_values("trade_date").head(1) if buy_date else pd.DataFrame()
-            sell_row = stock_quotes[stock_quotes["trade_date"] <= sell_date].sort_values("trade_date").tail(1) if sell_date else pd.DataFrame()
+            buy_row = stock_quotes[stock_quotes["trade_date"] >= buy_date].sort_values(
+                "trade_date").head(1) if buy_date else pd.DataFrame()
+            sell_row = stock_quotes[stock_quotes["trade_date"] <= sell_date].sort_values(
+                "trade_date").tail(1) if sell_date else pd.DataFrame()
             if buy_row.empty or sell_row.empty:
                 continue
             buy_price = float(buy_row.iloc[0]["open"])
@@ -103,18 +111,21 @@ def run_backtest(project_root: Path, start_value: str | date, end_value: str | d
             trade_df = pd.DataFrame(trade_rows)
             save_dataframe(
                 trade_df,
-                ensure_directory(project_root / "outputs/backtest" / monday.isoformat()) / "trade_details",
+                ensure_directory(project_root / "outputs/backtest" /
+                                 monday.isoformat()) / "trade_details",
             )
         cursor = monday + timedelta(days=7)
 
     summary_df = pd.DataFrame(results)
     if not summary_df.empty:
-        summary_df["net_value"] = (1 + summary_df["weekly_return"]).cumprod().round(6)
+        summary_df["net_value"] = (
+            1 + summary_df["weekly_return"]).cumprod().round(6)
     backtest_dir = ensure_directory(project_root / "outputs/backtest")
     save_dataframe(summary_df, backtest_dir / "weekly_summary")
 
     if joint_mean_car_frames:
-        historical_joint_df = pd.concat(joint_mean_car_frames, ignore_index=True)
+        historical_joint_df = pd.concat(
+            joint_mean_car_frames, ignore_index=True)
         historical_joint_summary = (
             historical_joint_df.groupby(["group_label", "day_offset"])
             .agg(
@@ -124,12 +135,16 @@ def run_backtest(project_root: Path, start_value: str | date, end_value: str | d
             .reset_index()
         )
         historical_joint_summary["note"] = "历史窗口联合均值CAR聚合"
-        save_dataframe(historical_joint_summary, backtest_dir / "historical_joint_mean_car")
-        _render_historical_joint_mean_car(historical_joint_summary, backtest_dir / "historical_joint_mean_car.png")
+        save_dataframe(historical_joint_summary,
+                       backtest_dir / "historical_joint_mean_car")
+        _render_historical_joint_mean_car(
+            historical_joint_summary, backtest_dir / "historical_joint_mean_car.png")
 
     if event_study_stats_frames:
-        historical_stats_df = pd.concat(event_study_stats_frames, ignore_index=True)
-        save_dataframe(historical_stats_df, backtest_dir / "historical_event_study_stats")
+        historical_stats_df = pd.concat(
+            event_study_stats_frames, ignore_index=True)
+        save_dataframe(historical_stats_df, backtest_dir /
+                       "historical_event_study_stats")
     return summary_df
 
 

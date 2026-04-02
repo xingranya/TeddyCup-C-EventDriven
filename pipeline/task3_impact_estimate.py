@@ -41,7 +41,8 @@ def run_impact_estimation(
         on=["event_id", "event_name"],
         how="left",
     ).merge(
-        stock_df[["stock_code", "stock_name", "industry", "avg_turnover_million"]],
+        stock_df[["stock_code", "stock_name",
+                  "industry", "avg_turnover_million"]],
         on=["stock_code", "stock_name"],
         how="left",
     )
@@ -85,8 +86,10 @@ def run_impact_estimation(
     stock_returns = prepare_return_series(price_df)
 
     # 计算自适应缩放因子
-    historical_car_std = _estimate_historical_car_volatility(price_df, benchmark_df)
-    adaptive_scale = min(0.25, max(0.10, historical_car_std * 2.5)) if historical_car_std > 0 else 0.18
+    historical_car_std = _estimate_historical_car_volatility(
+        price_df, benchmark_df)
+    adaptive_scale = min(0.25, max(0.10, historical_car_std * 2.5)
+                         ) if historical_car_std > 0 else 0.18
 
     predictions: list[dict[str, Any]] = []
     for _, row in merged.iterrows():
@@ -97,12 +100,16 @@ def run_impact_estimation(
         )
         if anchor_date is None:
             continue
-        stock_history = stock_returns[stock_returns["stock_code"] == row["stock_code"]].copy()
-        benchmark_history = benchmark_returns[benchmark_returns["stock_code"] == config.benchmark_code].copy()
+        stock_history = stock_returns[stock_returns["stock_code"]
+                                      == row["stock_code"]].copy()
+        benchmark_history = benchmark_returns[benchmark_returns["stock_code"]
+                                              == config.benchmark_code].copy()
 
-        regression_stats = estimate_market_model(stock_history, benchmark_history, anchor_date)
+        regression_stats = estimate_market_model(
+            stock_history, benchmark_history, anchor_date)
         event_score = round(
-            0.3 * row["heat_score"] + 0.35 * row["intensity_score"] + 0.2 * row["scope_score"] + 0.15 * row["confidence_score"],
+            0.3 * row["heat_score"] + 0.35 * row["intensity_score"] +
+            0.2 * row["scope_score"] + 0.15 * row["confidence_score"],
             4,
         )
         liquidity_score = min(1.0, float(row["avg_turnover_million"]) / 600)
@@ -136,13 +143,18 @@ def run_impact_estimation(
             ),
             4,
         )
-        risk_penalty = round(residual_risk * 0.6 + max(0.0, 0.2 - market_state), 4)
+        risk_penalty = round(residual_risk * 0.6 +
+                             max(0.0, 0.2 - market_state), 4)
         prediction_score = round(
-            config.raw["scoring"]["prediction"]["expected_car_4d"] * expected_car_4d
-            + config.raw["scoring"]["prediction"]["association_score"] * row["association_score"]
+            config.raw["scoring"]["prediction"]["expected_car_4d"] *
+            expected_car_4d
+            + config.raw["scoring"]["prediction"]["association_score"] *
+            row["association_score"]
             + config.raw["scoring"]["prediction"]["event_score"] * event_score
-            + config.raw["scoring"]["prediction"]["liquidity_score"] * liquidity_score
-            - config.raw["scoring"]["prediction"]["risk_penalty"] * risk_penalty,
+            + config.raw["scoring"]["prediction"]["liquidity_score"] *
+            liquidity_score
+            - config.raw["scoring"]["prediction"]["risk_penalty"] *
+            risk_penalty,
             4,
         )
         # 生成包含详细数值的逻辑链
@@ -219,7 +231,8 @@ def prepare_return_series(price_df: pd.DataFrame) -> pd.DataFrame:
 
     ordered = price_df.sort_values(["stock_code", "trade_date"]).copy()
     ordered["trade_date"] = pd.to_datetime(ordered["trade_date"])
-    ordered["return"] = ordered.groupby("stock_code")["close"].pct_change().fillna(0.0)
+    ordered["return"] = ordered.groupby(
+        "stock_code")["close"].pct_change().fillna(0.0)
     return ordered
 
 
@@ -229,9 +242,11 @@ def estimate_market_model(stock_history: pd.DataFrame, benchmark_history: pd.Dat
     estimation_end = pd.Timestamp(event_date + timedelta(days=-6))
     estimation_start = pd.Timestamp(event_date + timedelta(days=-60))
 
-    stock_window = stock_history[(stock_history["trade_date"] >= estimation_start) & (stock_history["trade_date"] <= estimation_end)]
+    stock_window = stock_history[(stock_history["trade_date"] >= estimation_start) & (
+        stock_history["trade_date"] <= estimation_end)]
     benchmark_window = benchmark_history[
-        (benchmark_history["trade_date"] >= estimation_start) & (benchmark_history["trade_date"] <= estimation_end)
+        (benchmark_history["trade_date"] >= estimation_start) & (
+            benchmark_history["trade_date"] <= estimation_end)
     ][["trade_date", "return"]].rename(columns={"return": "benchmark_return"})
     merged = stock_window.merge(benchmark_window, on="trade_date", how="inner")
     if len(merged) < 15:
@@ -241,7 +256,8 @@ def estimate_market_model(stock_history: pd.DataFrame, benchmark_history: pd.Dat
     y = merged["return"].to_numpy()
     beta, alpha = np.polyfit(x, y, 1)
     residual = y - (alpha + beta * x)
-    residual_volatility = float(np.clip(np.std(residual) * np.sqrt(252), 0.02, 0.8))
+    residual_volatility = float(
+        np.clip(np.std(residual) * np.sqrt(252), 0.02, 0.8))
     data_sufficiency = min(1.0, len(merged) / 50)
     return {
         "alpha": round(float(alpha), 6),
@@ -255,7 +271,8 @@ def compute_market_state(benchmark_history: pd.DataFrame, event_date) -> float:
     """估算当前市场状态。"""
 
     target_date = pd.Timestamp(event_date)
-    window = benchmark_history[benchmark_history["trade_date"] <= target_date].tail(10)
+    window = benchmark_history[benchmark_history["trade_date"] <= target_date].tail(
+        10)
     if window.empty:
         return 0.5
     recent_return = window["return"].mean()
@@ -425,15 +442,19 @@ def _estimate_historical_car_volatility(price_df: pd.DataFrame, benchmark_df: pd
     try:
         # 选择价格数据中出现最多的几只股票
         stock_counts = price_df['stock_code'].value_counts()
-        sample_stocks = stock_counts.head(min(10, len(stock_counts))).index.tolist()
+        sample_stocks = stock_counts.head(
+            min(10, len(stock_counts))).index.tolist()
 
         all_car = []
         for sc in sample_stocks:
-            stock_prices = price_df[price_df['stock_code'] == sc].sort_values('trade_date')
+            stock_prices = price_df[price_df['stock_code']
+                                    == sc].sort_values('trade_date')
             if len(stock_prices) < 30:
                 continue
-            stock_prices['trade_date'] = pd.to_datetime(stock_prices['trade_date'])
-            stock_ret = stock_prices.set_index('trade_date')['close'].pct_change()
+            stock_prices['trade_date'] = pd.to_datetime(
+                stock_prices['trade_date'])
+            stock_ret = stock_prices.set_index(
+                'trade_date')['close'].pct_change()
             # 简单市场调整：用benchmark的return
             bm = benchmark_df.sort_values('trade_date').copy()
             bm['trade_date'] = pd.to_datetime(bm['trade_date'])

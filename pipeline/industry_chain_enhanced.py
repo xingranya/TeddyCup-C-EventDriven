@@ -52,14 +52,18 @@ def run_industry_chain_enhanced(
     """构建产业链图谱增强输出。"""
 
     kg_dir = ensure_directory(output_dir / "kg_visual")
-    relation_map = load_json(project_root / "data/manual/industry_relation_map.json")
-    chain_relation_df = _build_chain_relations(event_df, relation_df, stock_df, relation_map)
+    relation_map = load_json(
+        project_root / "data/manual/industry_relation_map.json")
+    chain_relation_df = _build_chain_relations(
+        event_df, relation_df, stock_df, relation_map)
     save_dataframe(chain_relation_df, kg_dir / "industry_chain_relations")
 
-    selected_events = _select_featured_events(event_df, relation_df, prediction_df)
+    selected_events = _select_featured_events(
+        event_df, relation_df, prediction_df)
     per_event_pngs: list[Path] = []
     for event_id in selected_events:
-        subset = chain_relation_df[chain_relation_df["event_id"] == event_id].copy()
+        subset = chain_relation_df[chain_relation_df["event_id"] == event_id].copy(
+        )
         if subset.empty:
             continue
         event_png = kg_dir / f"industry_chain_{event_id}.png"
@@ -67,11 +71,13 @@ def run_industry_chain_enhanced(
         per_event_pngs.append(event_png)
 
     combined_png_path = kg_dir / "industry_chain_graph.png"
-    _render_combined_chain_png(chain_relation_df, selected_events, combined_png_path)
+    _render_combined_chain_png(
+        chain_relation_df, selected_events, combined_png_path)
     combined_html_path = kg_dir / "industry_chain_graph.html"
     _render_chain_html(chain_relation_df, selected_events, combined_html_path)
     summary_path = kg_dir / "industry_chain_summary.md"
-    _write_chain_summary(chain_relation_df, selected_events, summary_path, per_event_pngs)
+    _write_chain_summary(chain_relation_df, selected_events,
+                         summary_path, per_event_pngs)
 
     return IndustryChainArtifacts(
         relation_df=chain_relation_df,
@@ -90,8 +96,10 @@ def _build_chain_relations(
 ) -> pd.DataFrame:
     """构建链式产业关系表。"""
 
-    event_meta = event_df.set_index("event_id")[["event_name", "industry_type", "heat_score", "raw_evidence"]]
-    stock_meta = stock_df.set_index("stock_code")[["stock_name", "industry", "concept_tags", "main_business"]]
+    event_meta = event_df.set_index(
+        "event_id")[["event_name", "industry_type", "heat_score", "raw_evidence"]]
+    stock_meta = stock_df.set_index(
+        "stock_code")[["stock_name", "industry", "concept_tags", "main_business"]]
     rows: list[dict] = []
 
     for _, relation in relation_df.iterrows():
@@ -109,7 +117,8 @@ def _build_chain_relations(
         theme_payload = relation_map.get(theme_key, {})
         theme_match_score = _compute_theme_match(event_info, theme_payload)
 
-        mapped_links = _match_links(theme_payload, relation, stock_info, event_info)
+        mapped_links = _match_links(
+            theme_payload, relation, stock_info, event_info)
         if not mapped_links:
             mapped_links = [
                 {
@@ -179,16 +188,19 @@ def _compute_theme_match(event_info: pd.Series, theme_payload: dict) -> float:
     if not theme_payload:
         return 0.3
 
-    normalized_text = normalize_text(f"{event_info['event_name']} {event_info['raw_evidence']}")
+    normalized_text = normalize_text(
+        f"{event_info['event_name']} {event_info['raw_evidence']}")
     keywords = theme_payload.get("keywords", [])
 
     # 计算普通关键词命中
-    hits = sum(1 for keyword in keywords if normalize_text(keyword) in normalized_text)
+    hits = sum(1 for keyword in keywords if normalize_text(
+        keyword) in normalized_text)
     base_score = 0.45 + hits * 0.12
 
     # 核心关键词加分：检查前3个关键词是否有命中
     core_keywords = keywords[:3]
-    core_hits = sum(1 for keyword in core_keywords if normalize_text(keyword) in normalized_text)
+    core_hits = sum(1 for keyword in core_keywords if normalize_text(
+        keyword) in normalized_text)
     core_bonus = 0.15 if core_hits > 0 else 0.0
 
     return min(1.0, base_score + core_bonus)
@@ -198,8 +210,10 @@ def _match_links(theme_payload: dict, relation: pd.Series, stock_info: pd.Series
     """匹配产业链环节。"""
 
     matched: list[dict] = []
-    event_text = normalize_text(f"{event_info['event_name']} {event_info['raw_evidence']}")
-    stock_text = normalize_text(f"{stock_info['industry']} {stock_info['concept_tags']} {stock_info['main_business']}")
+    event_text = normalize_text(
+        f"{event_info['event_name']} {event_info['raw_evidence']}")
+    stock_text = normalize_text(
+        f"{stock_info['industry']} {stock_info['concept_tags']} {stock_info['main_business']}")
     for link in theme_payload.get("links", []):
         direct_stock_match = next(
             (
@@ -209,7 +223,8 @@ def _match_links(theme_payload: dict, relation: pd.Series, stock_info: pd.Series
             ),
             None,
         )
-        keyword_hits = sum(1 for keyword in link.get("keywords", []) if normalize_text(keyword) in event_text or normalize_text(keyword) in stock_text)
+        keyword_hits = sum(1 for keyword in link.get("keywords", []) if normalize_text(
+            keyword) in event_text or normalize_text(keyword) in stock_text)
         if direct_stock_match or keyword_hits > 0:
             link_match_score = min(
                 1.0,
@@ -235,16 +250,19 @@ def _select_featured_events(event_df: pd.DataFrame, relation_df: pd.DataFrame, p
         return []
     selected: list[str] = []
 
-    hottest = event_df.sort_values("heat_score", ascending=False).iloc[0]["event_id"]
+    hottest = event_df.sort_values(
+        "heat_score", ascending=False).iloc[0]["event_id"]
     selected.append(hottest)
 
     if not prediction_df.empty:
-        top_pred_event = prediction_df.sort_values("prediction_score", ascending=False).iloc[0]["event_id"]
+        top_pred_event = prediction_df.sort_values(
+            "prediction_score", ascending=False).iloc[0]["event_id"]
     else:
         top_pred_event = hottest
 
     if top_pred_event == hottest and not relation_df.empty:
-        breadth_df = relation_df.groupby("event_id")["stock_code"].nunique().reset_index(name="stock_breadth")
+        breadth_df = relation_df.groupby(
+            "event_id")["stock_code"].nunique().reset_index(name="stock_breadth")
         breadth_df = breadth_df.sort_values("stock_breadth", ascending=False)
         for _, row in breadth_df.iterrows():
             if row["event_id"] != hottest:
@@ -274,7 +292,8 @@ def _render_single_chain_png(subset: pd.DataFrame, output_path: Path) -> None:
         else:
             node_colors.append("#2a9d8f")
 
-    edge_widths = [max(1.2, graph[u][v].get("weight", 0.2) * 4) for u, v in graph.edges]
+    edge_widths = [max(1.2, graph[u][v].get("weight", 0.2) * 4)
+                   for u, v in graph.edges]
     nx.draw_networkx(
         graph,
         pos=positions,
@@ -305,12 +324,14 @@ def _render_combined_chain_png(chain_relation_df: pd.DataFrame, selected_events:
         plt.close()
         return
 
-    fig, axes = plt.subplots(len(selected_events), 1, figsize=(12, 6 * len(selected_events)))
+    fig, axes = plt.subplots(len(selected_events), 1,
+                             figsize=(12, 6 * len(selected_events)))
     if len(selected_events) == 1:
         axes = [axes]
 
     for index, event_id in enumerate(selected_events):
-        subset = chain_relation_df[chain_relation_df["event_id"] == event_id].head(12)
+        subset = chain_relation_df[chain_relation_df["event_id"] == event_id].head(
+            12)
         if subset.empty:
             axes[index].text(0.5, 0.5, "暂无可用链路样本", ha="center", va="center")
             axes[index].axis("off")
@@ -328,7 +349,8 @@ def _render_combined_chain_png(chain_relation_df: pd.DataFrame, selected_events:
                 node_colors.append("#4d96ff")
             else:
                 node_colors.append("#2a9d8f")
-        edge_widths = [max(1.2, graph[u][v].get("weight", 0.2) * 4) for u, v in graph.edges]
+        edge_widths = [max(1.2, graph[u][v].get("weight", 0.2) * 4)
+                       for u, v in graph.edges]
         nx.draw_networkx(
             graph,
             pos=positions,
@@ -355,13 +377,15 @@ def _render_chain_html(chain_relation_df: pd.DataFrame, selected_events: list[st
     """生成 HTML 版产业链图谱。"""
 
     if not selected_events:
-        output_path.write_text("<html><body><h1>暂无产业链图谱样本</h1></body></html>", encoding="utf-8")
+        output_path.write_text(
+            "<html><body><h1>暂无产业链图谱样本</h1></body></html>", encoding="utf-8")
         return
 
     figures: list[str] = []
     first_figure = True
     for event_id in selected_events:
-        subset = chain_relation_df[chain_relation_df["event_id"] == event_id].head(12)
+        subset = chain_relation_df[chain_relation_df["event_id"] == event_id].head(
+            12)
         if subset.empty:
             continue
         graph = _build_chain_graph(subset)
@@ -407,7 +431,8 @@ def _render_chain_html(chain_relation_df: pd.DataFrame, selected_events: list[st
             text=node_text,
             textposition="top center",
             hoverinfo="text",
-            marker={"size": 18, "color": node_color, "line": {"width": 1, "color": "#ffffff"}},
+            marker={"size": 18, "color": node_color,
+                    "line": {"width": 1, "color": "#ffffff"}},
         )
         figure = go.Figure(data=[edge_trace, node_trace])
         figure.update_layout(
@@ -441,7 +466,8 @@ def _write_chain_summary(chain_relation_df: pd.DataFrame, selected_events: list[
 
     sections: list[str] = ["# 产业链图谱说明", ""]
     for index, event_id in enumerate(selected_events, start=1):
-        subset = chain_relation_df[chain_relation_df["event_id"] == event_id].head(8)
+        subset = chain_relation_df[chain_relation_df["event_id"] == event_id].head(
+            8)
         if subset.empty:
             continue
         sections.append(f"## 重点事件 {index}")
@@ -450,7 +476,8 @@ def _write_chain_summary(chain_relation_df: pd.DataFrame, selected_events: list[
         sections.append(f"- 覆盖环节数：{subset['link_name'].nunique()}")
         sections.append(f"- 覆盖股票数：{subset['stock_code'].nunique()}")
         sections.append("")
-        sections.append(subset[["theme_name", "link_name", "stock_name", "association_score", "chain_confidence", "relation_path"]].to_markdown(index=False))
+        sections.append(subset[["theme_name", "link_name", "stock_name", "association_score",
+                        "chain_confidence", "relation_path"]].to_markdown(index=False))
         sections.append("")
     if per_event_pngs:
         sections.append("## 图谱文件")
@@ -472,9 +499,13 @@ def _build_chain_graph(subset: pd.DataFrame) -> nx.Graph:
         graph.add_node(theme_node, node_type="industry_theme")
         graph.add_node(link_node, node_type="industry_link")
         graph.add_node(stock_node, node_type="stock")
-        graph.add_edge(event_node, theme_node, edge_type="event_to_theme", weight=max(0.6, row["theme_match_score"]))
-        graph.add_edge(theme_node, link_node, edge_type="theme_to_link", weight=max(0.6, row["link_match_score"]))
-        graph.add_edge(link_node, stock_node, edge_type="link_to_stock", weight=max(0.8, row["association_score"]))
+        graph.add_edge(event_node, theme_node, edge_type="event_to_theme", weight=max(
+            0.6, row["theme_match_score"]))
+        graph.add_edge(theme_node, link_node, edge_type="theme_to_link",
+                       weight=max(0.6, row["link_match_score"]))
+        graph.add_edge(link_node, stock_node, edge_type="link_to_stock",
+                       weight=max(0.8, row["association_score"]))
         if float(row["association_score"]) >= 0.75:
-            graph.add_edge(event_node, stock_node, edge_type="event_to_stock_direct", weight=row["association_score"])
+            graph.add_edge(event_node, stock_node,
+                           edge_type="event_to_stock_direct", weight=row["association_score"])
     return graph

@@ -37,7 +37,8 @@ WEIGHT_PROFILES = {
     "宏观类事件": {"direct": 0.25, "business": 0.20, "industry": 0.35, "co_move": 0.20},
     "地缘类事件": {"direct": 0.30, "business": 0.20, "industry": 0.35, "co_move": 0.15},
 }
-DEFAULT_WEIGHTS = {"direct": 0.45, "business": 0.25, "industry": 0.20, "co_move": 0.10}
+DEFAULT_WEIGHTS = {"direct": 0.45, "business": 0.25,
+                   "industry": 0.20, "co_move": 0.10}
 
 
 def run_relation_mining(
@@ -50,7 +51,8 @@ def run_relation_mining(
 ) -> tuple[pd.DataFrame, list[Path]]:
     """基于事件与股票池构建关联关系和图谱。"""
 
-    relation_map = load_json(project_root / "data/manual/industry_relation_map.json")
+    relation_map = load_json(
+        project_root / "data/manual/industry_relation_map.json")
     price_returns = compute_returns(price_df)
     relations: list[dict[str, Any]] = []
 
@@ -66,9 +68,11 @@ def run_relation_mining(
         }
 
         for _, stock in stock_df.iterrows():
-            direct_mention = 1.0 if normalize_text(stock["stock_name"]) in normalized_event_text else 0.0
+            direct_mention = 1.0 if normalize_text(
+                stock["stock_name"]) in normalized_event_text else 0.0
             business_match = compute_business_match(event_text, stock)
-            industry_overlap = compute_industry_overlap(event["industry_type"], stock)
+            industry_overlap = compute_industry_overlap(
+                event["industry_type"], stock)
             historical_co_move = compute_historical_co_move(
                 stock["stock_code"], event["industry_type"], price_returns, stock_df
             )
@@ -91,7 +95,8 @@ def run_relation_mining(
             if association_score < 0.2:
                 continue
 
-            relation_type = priority_stocks.get(stock["stock_code"], {}).get("relation_type", "文本与业务关联")
+            relation_type = priority_stocks.get(
+                stock["stock_code"], {}).get("relation_type", "文本与业务关联")
             relation_path = priority_stocks.get(stock["stock_code"], {}).get(
                 "relation_path",
                 f"{event['event_name']} -> {stock['industry']}需求变化 -> {stock['stock_name']}受影响",
@@ -127,7 +132,8 @@ def compute_returns(price_df: pd.DataFrame) -> pd.DataFrame:
     """计算收益率序列。"""
 
     ordered = price_df.sort_values(["stock_code", "trade_date"]).copy()
-    ordered["return"] = ordered.groupby("stock_code")["close"].pct_change().fillna(0.0)
+    ordered["return"] = ordered.groupby(
+        "stock_code")["close"].pct_change().fillna(0.0)
     return ordered
 
 
@@ -230,7 +236,8 @@ def compute_historical_co_move(
         return 0.5
 
     # 提取该股票的收益率序列
-    stock_returns = price_returns[price_returns["stock_code"] == stock_code][["trade_date", "return"]].copy()
+    stock_returns = price_returns[price_returns["stock_code"] == stock_code][[
+        "trade_date", "return"]].copy()
     if stock_returns.empty or len(stock_returns) < 20:
         return 0.5
 
@@ -246,16 +253,19 @@ def compute_historical_co_move(
         return 0.5
 
     # 计算同行业股票的平均收益率
-    peer_returns = price_returns[price_returns["stock_code"].isin(peer_stocks)][["trade_date", "return", "stock_code"]]
+    peer_returns = price_returns[price_returns["stock_code"].isin(
+        peer_stocks)][["trade_date", "return", "stock_code"]]
     if peer_returns.empty:
         return 0.5
 
     # 按日期计算同行业平均收益率
-    peer_avg_returns = peer_returns.groupby("trade_date")["return"].mean().reset_index()
+    peer_avg_returns = peer_returns.groupby(
+        "trade_date")["return"].mean().reset_index()
     peer_avg_returns.columns = ["trade_date", "peer_avg_return"]
 
     # 合并该股票收益率与同行业平均收益率
-    merged = stock_returns.merge(peer_avg_returns, on="trade_date", how="inner")
+    merged = stock_returns.merge(
+        peer_avg_returns, on="trade_date", how="inner")
 
     # 检查共同交易日数量
     if len(merged) < 20:
@@ -301,7 +311,8 @@ def render_relation_graphs(relation_df: pd.DataFrame, output_dir: Path) -> list[
     if relation_df.empty:
         return graph_paths
 
-    top_event_ids = relation_df.groupby("event_id")["association_score"].max().sort_values(ascending=False).head(2).index.tolist()
+    top_event_ids = relation_df.groupby("event_id")["association_score"].max(
+    ).sort_values(ascending=False).head(2).index.tolist()
     graph_dir = output_dir / "kg_visual"
     graph_dir.mkdir(parents=True, exist_ok=True)
 
@@ -314,11 +325,13 @@ def render_relation_graphs(relation_df: pd.DataFrame, output_dir: Path) -> list[
         graph.add_node(event_name, node_type="event")
         for _, row in subset.iterrows():
             graph.add_node(row["stock_name"], node_type="stock")
-            graph.add_edge(event_name, row["stock_name"], weight=row["association_score"])
+            graph.add_edge(
+                event_name, row["stock_name"], weight=row["association_score"])
 
         positions = nx.spring_layout(graph, seed=42, k=0.8)
         plt.figure(figsize=(10, 6))
-        colors = ["#d1495b" if node == event_name else "#2d6a4f" for node in graph.nodes]
+        colors = ["#d1495b" if node ==
+                  event_name else "#2d6a4f" for node in graph.nodes]
         nx.draw_networkx(
             graph,
             pos=positions,

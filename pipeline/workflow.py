@@ -40,9 +40,12 @@ def run_weekly_pipeline(project_root: Path, asof_value: str | date, config_path:
 
     config = load_config(project_root, config_path)
     asof_date = parse_date(asof_value)
-    output_dir = ensure_directory(project_root / "outputs/weekly" / asof_date.isoformat())
-    raw_dir = ensure_directory(project_root / "data/raw" / asof_date.isoformat())
-    processed_dir = ensure_directory(project_root / "data/processed" / asof_date.isoformat())
+    output_dir = ensure_directory(
+        project_root / "outputs/weekly" / asof_date.isoformat())
+    raw_dir = ensure_directory(
+        project_root / "data/raw" / asof_date.isoformat())
+    processed_dir = ensure_directory(
+        project_root / "data/processed" / asof_date.isoformat())
     context = RunContext(
         asof_date=asof_date,
         project_root=project_root,
@@ -84,7 +87,8 @@ def run_weekly_pipeline(project_root: Path, asof_value: str | date, config_path:
     # financial_data step
     related_stock_codes = []
     if not relation_df.empty and "stock_code" in relation_df.columns:
-        related_stock_codes = relation_df["stock_code"].dropna().astype(str).unique().tolist()
+        related_stock_codes = relation_df["stock_code"].dropna().astype(
+            str).unique().tolist()
 
     try:
         financial_df = fetch_financial_data(
@@ -107,8 +111,10 @@ def run_weekly_pipeline(project_root: Path, asof_value: str | date, config_path:
         print(f"[ERROR] suspend_resume_data step failed: {e}")
         suspend_resume_df = pd.DataFrame()
 
-    save_dataframe(financial_df, context.raw_dir / f"financial_{context.asof_date.isoformat()}")
-    save_dataframe(suspend_resume_df, context.raw_dir / f"suspend_resume_{context.asof_date.isoformat()}")
+    save_dataframe(financial_df, context.raw_dir /
+                   f"financial_{context.asof_date.isoformat()}")
+    save_dataframe(suspend_resume_df, context.raw_dir /
+                   f"suspend_resume_{context.asof_date.isoformat()}")
 
     # impact_estimate step
     try:

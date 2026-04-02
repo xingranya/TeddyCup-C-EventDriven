@@ -1,5 +1,74 @@
 # 更新日志
 
+## 2026-04-02 — 全面优化与竞赛适配升级
+
+### 关键缺陷修复
+- **修复 `historical_co_move` 伪随机问题**：`task2_relation_mining.py` 中的 `compute_historical_co_move()` 从伪随机种子改为基于真实价格数据的皮尔逊相关系数计算，关联强度指标现在具有真实市场意义
+- **全局容错机制**：`workflow.py` 每个 pipeline 步骤添加 try-except 容错，单步失败降级继续，不再导致全流程中断
+- **回测交易成本**：`backtest.py` 新增佣金(0.1%)和滑点(0.05%)扣除，回测结果更贴近实盘
+- **IndexError 防护**：`task4_strategy.py` 的 `build_pick_reason` 添加空值检查
+- **Dataclass 兜底构造修正**：修复 `EventStudyArtifacts` 和 `IndustryChainArtifacts` 异常路径的参数不匹配
+- **行业标签映射**：`industry_chain_enhanced.py` 和 `task2_relation_mining.py` 添加 `INDUSTRY_LABEL_MAP`，确保 "军工类事件" 等标签正确映射到 `industry_relation_map.json` 的键
+
+### 事件识别增强 (Task 1)
+- `EVENT_TAXONOMY` 从硬编码迁移至 `config/config.yaml`，支持动态扩展
+- 行业覆盖从 5 类扩展至 10 类（新增消费、医药、金融、地产、农业）
+- 聚类算法增加标题 Jaccard 相似度维度（阈值 0.35）
+- `confidence_score` 改用 logistic 非线性变换提升区分度
+- 事件名称选择增加长度过滤（8-60 字符）
+
+### 关联挖掘改进 (Task 2)
+- `compute_business_match` 实现渐进式匹配（完全匹配 0.30 + 部分匹配 0.15）
+- `compute_industry_overlap` 引入 `INDUSTRY_GROUP_MAP` 申万行业映射
+- 关联权重根据事件驱动主体类型动态调整（`WEIGHT_PROFILES` 5 种配置）
+- `industry_relation_map.json` 新增消费、医药、金融、农业四个行业产业链映射
+
+### 影响预测提升 (Task 3)
+- 基本面评分支持行业中位数相对评分（`sector_median_pe/pb/roe` 参数），保持向后兼容
+- CAR 缩放因子从固定 0.18 改为基于历史 CAR 波动率的自适应计算（范围 0.10-0.25）
+- `event_study_enhanced.py` 新增 t-stat 和 p-value 统计检验列（依赖 scipy）
+- 逻辑链条输出包含具体数值（热度、关联度、预期 CAR、综合评分）
+
+### 策略优化 (Task 4)
+- 选股评分融入 5 日动量因子（权重 15%）
+- 兜底池采用显式加权公式（流动性 0.4 + 置信度 0.35 + 安全性 0.25）
+- 仓位分配增加置信度加权逻辑，仓位下限放宽至 15%
+- 新增空仓保护：所有标的预期收益为负时不交易
+
+### 报告与输出完善
+- `report_builder.py` 新增研究方法论详细说明章节
+- 新增每只选中股票的完整投资决策推理链
+- `generate_result_xlsx.py` 格式确认符合竞赛三列要求
+
+### 依赖更新
+- `requirements.txt` 新增 `scipy>=1.12.0`
+
+## 2026-04-02
+
+### 数据链路修复
+
+### 数据链路修复
+
+- **竞赛模式切换**：正式运行不再使用仓库样例或伪随机行情生成结果，改为真实数据链路优先
+- **事件输入标准化**：新增 `data/events/policy|announcement|industry|macro` 导入目录，事件表统一输出 `published_at`、`source_name`、`source_url`、`entity_candidates`、`raw_id`、`content_hash`
+- **交易日历兜底**：`fetch_trading_calendar()` 在 Tushare 权限不足时改走公开交易日日历
+- **股票池收缩**：`fetch_stock_universe()` 在接口频控受限时回退到本地竞赛候选池，并结合事件文本与产业映射收缩候选股票范围
+- **财务与基准兜底**：估值、财务和指数权限不足时改为公开源或市场代理口径，不再直接中断整条流程
+
+### 正确性修复
+
+- **事件锚点修复**：`event_study_enhanced.py` 按完整 `published_at` 与收盘时点确定锚点，收盘后事件顺延到下一交易日
+- **CAR 统计口径修复**：统计表严格输出 `AR(+1)`、`CAR(0,2)`、`CAR(0,4)`，不再把 `day_offset=-1` 误计入汇总
+- **停牌开区间处理**：`is_tradeable()` 将“只有停牌日、没有复牌日”的记录视为持续停牌
+- **周内买卖日修复**：周二休市时顺延到当周后续首个交易日买入，卖出日改为当周最后一个交易日
+
+### 验证结果
+
+- 已跑通 `main_weekly.py --asof 2025-12-08`
+- 已跑通 `main_weekly.py --asof 2026-03-30`
+- 已跑通 `main_backtest.py --start 2025-12-08 --end 2025-12-26`
+- 新增 8 个单元测试，覆盖事件锚点、CAR 口径、停牌区间、交易日顺延、财务快照与 `result.xlsx` 输出格式
+
 ## 2026-04-01
 
 ### 新增功能

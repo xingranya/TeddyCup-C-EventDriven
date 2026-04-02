@@ -20,7 +20,13 @@ def load_config(project_root: Path, config_path: str | None = None) -> AppConfig
         raw: dict[str, Any] = yaml.safe_load(file)
 
     token_env = raw.get("tushare", {}).get("token_env", "TUSHARE_TOKEN")
-    if token_env and not raw.get("tushare", {}).get("token"):
-        raw.setdefault("tushare", {})["token"] = os.getenv(token_env, "")
+    raw.setdefault("tushare", {})
+    config_token = str(raw["tushare"].get("token", "") or "").strip()
+    env_token = os.getenv(token_env, "").strip() if token_env else ""
+    raw["tushare"]["token"] = config_token or env_token
+    if not raw["tushare"]["token"]:
+        raise RuntimeError(
+            f"未检测到 Tushare 凭证，请在配置文件中设置 tushare.token 或先设置环境变量 {token_env}。"
+        )
 
     return AppConfig(raw=raw)

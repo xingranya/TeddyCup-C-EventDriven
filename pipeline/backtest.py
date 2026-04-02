@@ -6,8 +6,14 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from pipeline.fetch_data import fetch_price_history, fetch_trading_calendar
+from pipeline.settings import load_config
+from pipeline.task4_strategy import next_trading_date, week_last_trading_date
 from pipeline.workflow import run_weekly_pipeline
-from pipeline.utils import ensure_directory, parse_date, save_dataframe
+from pipeline.utils import ensure_directory, parse_date, save_dataframe, configure_matplotlib_chinese
+
+# 配置 matplotlib 支持中文显示
+configure_matplotlib_chinese()
 
 
 def run_backtest(project_root: Path, start_value: str | date, end_value: str | date) -> pd.DataFrame:
@@ -15,6 +21,8 @@ def run_backtest(project_root: Path, start_value: str | date, end_value: str | d
 
     start_date = parse_date(start_value)
     end_date = parse_date(end_value)
+    config = load_config(project_root)
+    trading_calendar = fetch_trading_calendar(start_date - timedelta(days=7), end_date + timedelta(days=7), config)
     results: list[dict] = []
     joint_mean_car_frames: list[pd.DataFrame] = []
     event_study_stats_frames: list[pd.DataFrame] = []
@@ -36,22 +44,35 @@ def run_backtest(project_root: Path, start_value: str | date, end_value: str | d
             stats_df = artifacts.event_study_artifacts.stats_df.copy()
             stats_df["week_monday"] = monday.isoformat()
             event_study_stats_frames.append(stats_df)
-        prices = pd.read_csv(project_root / "data/raw" / monday.isoformat() / f"prices_{monday.isoformat()}.csv")
-        prices["stock_code"] = prices["stock_code"].astype(str).apply(lambda code: code.zfill(6) if code.isdigit() else code)
-        prices["trade_date"] = pd.to_datetime(prices["trade_date"]).dt.date
+        buy_date = next_trading_date(trading_calendar, monday, target_weekday=1)
+        sell_date = week_last_trading_date(trading_calendar, monday)
+        week_prices = pd.DataFrame(columns=["stock_code", "trade_date", "open", "close"])
+        if buy_date is not None and sell_date is not None and not artifacts.final_picks.empty:
+            week_prices = fetch_price_history(
+                stock_codes=artifacts.final_picks["stock_code"].astype(str).tolist(),
+                start_date=buy_date,
+                end_date=sell_date,
+                config=config,
+                trading_calendar=trading_calendar,
+            )
+            week_prices["trade_date"] = pd.to_datetime(week_prices["trade_date"]).dt.date
         week_return = 0.0
         trade_rows = []
 
         for _, pick in artifacts.final_picks.iterrows():
             pick_code = str(pick["stock_code"]).zfill(6) if str(pick["stock_code"]).isdigit() else str(pick["stock_code"])
-            stock_quotes = prices[prices["stock_code"] == pick_code]
-            buy_row = stock_quotes[stock_quotes["trade_date"] >= tuesday].sort_values("trade_date").head(1)
-            sell_row = stock_quotes[stock_quotes["trade_date"] <= friday].sort_values("trade_date").tail(1)
+            stock_quotes = week_prices[week_prices["stock_code"] == pick_code]
+            buy_row = stock_quotes[stock_quotes["trade_date"] >= buy_date].sort_values("trade_date").head(1) if buy_date else pd.DataFrame()
+            sell_row = stock_quotes[stock_quotes["trade_date"] <= sell_date].sort_values("trade_date").tail(1) if sell_date else pd.DataFrame()
             if buy_row.empty or sell_row.empty:
                 continue
             buy_price = float(buy_row.iloc[0]["open"])
             sell_price = float(sell_row.iloc[0]["close"])
-            trade_return = (sell_price / buy_price) - 1
+            # 计算交易成本：佣金0.1% + 滑点0.05%，买卖各一次
+            commission_rate = 0.001
+            slippage = 0.0005
+            total_cost = commission_rate * 2 + slippage * 2
+            trade_return = (sell_price / buy_price) - 1 - total_cost
             weighted_return = trade_return * float(pick["capital_ratio"])
             week_return += weighted_return
             trade_rows.append(
@@ -71,8 +92,8 @@ def run_backtest(project_root: Path, start_value: str | date, end_value: str | d
         results.append(
             {
                 "week_monday": monday.isoformat(),
-                "buy_date": tuesday.isoformat(),
-                "sell_date": friday.isoformat(),
+                "buy_date": buy_date.isoformat() if buy_date else "",
+                "sell_date": sell_date.isoformat() if sell_date else "",
                 "weekly_return": round(week_return, 6),
                 "pick_count": int(len(artifacts.final_picks)),
             }

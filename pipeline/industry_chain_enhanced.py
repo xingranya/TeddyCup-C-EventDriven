@@ -9,7 +9,24 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from pipeline.models import AppConfig
-from pipeline.utils import ensure_directory, load_json, normalize_text, save_dataframe
+from pipeline.utils import ensure_directory, load_json, normalize_text, save_dataframe, configure_matplotlib_chinese
+
+# 配置 matplotlib 支持中文显示
+configure_matplotlib_chinese()
+
+# 行业标签映射：将事件识别后的 industry_type 映射到 relation_map 的键
+INDUSTRY_LABEL_MAP = {
+    "军工类事件": "军工",
+    "科技类事件": "科技",
+    "新能源类事件": "新能源",
+    "低空类事件": "低空经济",
+    "消费类事件": "消费",
+    "医药类事件": "医药",
+    "金融类事件": "金融",
+    "农业类事件": "农业",
+    "地产类事件": "地产",
+    "业绩类事件": "业绩",
+}
 
 
 @dataclass(slots=True)
@@ -86,8 +103,10 @@ def _build_chain_relations(
         if stock_code not in stock_meta.index:
             continue
         stock_info = stock_meta.loc[stock_code]
-        theme_name = event_info["industry_type"]
-        theme_payload = relation_map.get(theme_name, {})
+        raw_industry = event_info.get("industry_type", "")
+        theme_key = INDUSTRY_LABEL_MAP.get(raw_industry, raw_industry)
+        theme_name = theme_key
+        theme_payload = relation_map.get(theme_key, {})
         theme_match_score = _compute_theme_match(event_info, theme_payload)
 
         mapped_links = _match_links(theme_payload, relation, stock_info, event_info)
@@ -151,13 +170,28 @@ def _build_chain_relations(
 
 
 def _compute_theme_match(event_info: pd.Series, theme_payload: dict) -> float:
-    """计算主题匹配分。"""
+    """计算主题匹配分（增强版）。
+
+    基于关键词命中数计算，baseline 0.45。
+    如果事件文本中包含产业主题的核心关键词（前3个关键词），给予额外 0.15 的核心关键词加分。
+    """
 
     if not theme_payload:
         return 0.3
+
     normalized_text = normalize_text(f"{event_info['event_name']} {event_info['raw_evidence']}")
-    hits = sum(1 for keyword in theme_payload.get("keywords", []) if normalize_text(keyword) in normalized_text)
-    return min(1.0, 0.45 + hits * 0.12)
+    keywords = theme_payload.get("keywords", [])
+
+    # 计算普通关键词命中
+    hits = sum(1 for keyword in keywords if normalize_text(keyword) in normalized_text)
+    base_score = 0.45 + hits * 0.12
+
+    # 核心关键词加分：检查前3个关键词是否有命中
+    core_keywords = keywords[:3]
+    core_hits = sum(1 for keyword in core_keywords if normalize_text(keyword) in normalized_text)
+    core_bonus = 0.15 if core_hits > 0 else 0.0
+
+    return min(1.0, base_score + core_bonus)
 
 
 def _match_links(theme_payload: dict, relation: pd.Series, stock_info: pd.Series, event_info: pd.Series) -> list[dict]:

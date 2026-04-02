@@ -359,5 +359,335 @@
         "relation_path": "行业景气向上 -> 财报兑现 -> 龙头公司受益"
       }
     ]
+  },
+  "消费": {
+    "theme_name": "大消费",
+    "summary": "围绕食品饮料、家用电器、商贸零售等消费领域构建产业链传导路径。",
+    "keywords": ["消费", "食品饮料", "家电", "零售", "白酒", "乳制品", "调味品", "家电下乡"],
+    "links": [
+      {
+        "link_name": "食品饮料",
+        "keywords": ["白酒", "乳制品", "调味品", "饮料", "食品"],
+        "template": "事件 -> 消费主题 -> 食品饮料 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "000858",
+            "stock_name": "五粮液",
+            "relation_type": "白酒龙头",
+            "relation_path": "消费复苏 -> 白酒需求提升 -> 五粮液受益"
+          },
+          {
+            "stock_code": "600887",
+            "stock_name": "伊利股份",
+            "relation_type": "乳制品龙头",
+            "relation_path": "消费复苏 -> 乳制品需求提升 -> 伊利股份受益"
+          }
+        ]
+      },
+      {
+        "link_name": "家用电器",
+        "keywords": ["家电", "空调", "冰箱", "洗衣机", "厨电", "小家电"],
+        "template": "事件 -> 消费主题 -> 家用电器 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "000333",
+            "stock_name": "美的集团",
+            "relation_type": "家电龙头",
+            "relation_path": "消费刺激 -> 家电需求提升 -> 美的集团受益"
+          },
+          {
+            "stock_code": "000651",
+            "stock_name": "格力电器",
+            "relation_type": "空调龙头",
+            "relation_path": "消费刺激 -> 空调需求提升 -> 格力电器受益"
+          }
+        ]
+      },
+      {
+        "link_name": "商贸零售",
+        "keywords": ["零售", "商超", "电商", "免税", "百货"],
+        "template": "事件 -> 消费主题 -> 商贸零售 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "600859",
+            "stock_name": "王府井",
+            "relation_type": "零售龙头",
+            "relation_path": "消费复苏 -> 零售需求提升 -> 王府井受益"
+          }
+        ]
+      }
+    ],
+    "stocks": [
+      {
+        "stock_code": "000858",
+        "stock_name": "五粮液",
+        "relation_type": "白酒龙头",
+        "relation_path": "消费复苏 -> 白酒需求提升 -> 五粮液受益"
+      },
+      {
+        "stock_code": "600887",
+        "stock_name": "伊利股份",
+        "relation_type": "乳制品龙头",
+        "relation_path": "消费复苏 -> 乳制品需求提升 -> 伊利股份受益"
+      },
+      {
+        "stock_code": "000333",
+        "stock_name": "美的集团",
+        "relation_type": "家电龙头",
+        "relation_path": "消费刺激 -> 家电需求提升 -> 美的集团受益"
+      },
+      {
+        "stock_code": "000651",
+        "stock_name": "格力电器",
+        "relation_type": "空调龙头",
+        "relation_path": "消费刺激 -> 空调需求提升 -> 格力电器受益"
+      }
+    ]
+  },
+  "医药": {
+    "theme_name": "医药生物",
+    "summary": "围绕创新药、医疗器械、生物制品等医药领域构建产业链传导路径。",
+    "keywords": ["医药", "创新药", "医疗器械", "生物制品", "中药", "CXO", "医疗服务", "集采"],
+    "links": [
+      {
+        "link_name": "创新药",
+        "keywords": ["创新药", "研发", "临床试验", "新药上市", "生物药"],
+        "template": "事件 -> 医药主题 -> 创新药 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "600276",
+            "stock_name": "恒瑞医药",
+            "relation_type": "创新药龙头",
+            "relation_path": "医药政策支持 -> 创新药研发加速 -> 恒瑞医药受益"
+          },
+          {
+            "stock_code": "000538",
+            "stock_name": "云南白药",
+            "relation_type": "中药龙头",
+            "relation_path": "中药政策支持 -> 中药需求提升 -> 云南白药受益"
+          }
+        ]
+      },
+      {
+        "link_name": "医疗器械",
+        "keywords": ["医疗器械", "医疗设备", "耗材", "诊断", "影像"],
+        "template": "事件 -> 医药主题 -> 医疗器械 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "300760",
+            "stock_name": "迈瑞医疗",
+            "relation_type": "医疗器械龙头",
+            "relation_path": "医疗需求增长 -> 医疗器械需求提升 -> 迈瑞医疗受益"
+          }
+        ]
+      },
+      {
+        "link_name": "CXO服务",
+        "keywords": ["CXO", "CRO", "CDMO", "研发外包", "生产外包"],
+        "template": "事件 -> 医药主题 -> CXO服务 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "603259",
+            "stock_name": "药明康德",
+            "relation_type": "CXO龙头",
+            "relation_path": "创新药研发增长 -> CXO需求提升 -> 药明康德受益"
+          }
+        ]
+      }
+    ],
+    "stocks": [
+      {
+        "stock_code": "600276",
+        "stock_name": "恒瑞医药",
+        "relation_type": "创新药龙头",
+        "relation_path": "医药政策支持 -> 创新药研发加速 -> 恒瑞医药受益"
+      },
+      {
+        "stock_code": "300760",
+        "stock_name": "迈瑞医疗",
+        "relation_type": "医疗器械龙头",
+        "relation_path": "医疗需求增长 -> 医疗器械需求提升 -> 迈瑞医疗受益"
+      },
+      {
+        "stock_code": "603259",
+        "stock_name": "药明康德",
+        "relation_type": "CXO龙头",
+        "relation_path": "创新药研发增长 -> CXO需求提升 -> 药明康德受益"
+      },
+      {
+        "stock_code": "000538",
+        "stock_name": "云南白药",
+        "relation_type": "中药龙头",
+        "relation_path": "中药政策支持 -> 中药需求提升 -> 云南白药受益"
+      }
+    ]
+  },
+  "金融": {
+    "theme_name": "大金融",
+    "summary": "围绕银行、保险、券商等金融领域构建产业链传导路径。",
+    "keywords": ["金融", "银行", "保险", "券商", "证券", "降息", "降准", "资本市场改革"],
+    "links": [
+      {
+        "link_name": "银行",
+        "keywords": ["银行", "信贷", "息差", "资产质量", "普惠金融"],
+        "template": "事件 -> 金融主题 -> 银行 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "600036",
+            "stock_name": "招商银行",
+            "relation_type": "股份制银行龙头",
+            "relation_path": "货币政策宽松 -> 银行信贷扩张 -> 招商银行受益"
+          },
+          {
+            "stock_code": "601398",
+            "stock_name": "工商银行",
+            "relation_type": "国有大行龙头",
+            "relation_path": "货币政策宽松 -> 银行信贷扩张 -> 工商银行受益"
+          }
+        ]
+      },
+      {
+        "link_name": "券商",
+        "keywords": ["券商", "证券", "投行", "经纪", "自营", "资本市场改革"],
+        "template": "事件 -> 金融主题 -> 券商 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "600030",
+            "stock_name": "中信证券",
+            "relation_type": "券商龙头",
+            "relation_path": "资本市场活跃 -> 券商业务增长 -> 中信证券受益"
+          },
+          {
+            "stock_code": "300059",
+            "stock_name": "东方财富",
+            "relation_type": "互联网券商",
+            "relation_path": "资本市场活跃 -> 互联网券商流量增长 -> 东方财富受益"
+          }
+        ]
+      },
+      {
+        "link_name": "保险",
+        "keywords": ["保险", "寿险", "财险", "健康险", "保费"],
+        "template": "事件 -> 金融主题 -> 保险 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "601318",
+            "stock_name": "中国平安",
+            "relation_type": "保险龙头",
+            "relation_path": "保险需求增长 -> 保费收入提升 -> 中国平安受益"
+          }
+        ]
+      }
+    ],
+    "stocks": [
+      {
+        "stock_code": "600036",
+        "stock_name": "招商银行",
+        "relation_type": "股份制银行龙头",
+        "relation_path": "货币政策宽松 -> 银行信贷扩张 -> 招商银行受益"
+      },
+      {
+        "stock_code": "601398",
+        "stock_name": "工商银行",
+        "relation_type": "国有大行龙头",
+        "relation_path": "货币政策宽松 -> 银行信贷扩张 -> 工商银行受益"
+      },
+      {
+        "stock_code": "600030",
+        "stock_name": "中信证券",
+        "relation_type": "券商龙头",
+        "relation_path": "资本市场活跃 -> 券商业务增长 -> 中信证券受益"
+      },
+      {
+        "stock_code": "601318",
+        "stock_name": "中国平安",
+        "relation_type": "保险龙头",
+        "relation_path": "保险需求增长 -> 保费收入提升 -> 中国平安受益"
+      }
+    ]
+  },
+  "农业": {
+    "theme_name": "农林牧渔",
+    "summary": "围绕种植业、养殖业、农产品加工等农业领域构建产业链传导路径。",
+    "keywords": ["农业", "农林牧渔", "种业", "养殖", "猪肉", "粮食安全", "乡村振兴", "农产品"],
+    "links": [
+      {
+        "link_name": "种业",
+        "keywords": ["种业", "种子", "转基因", "育种", "粮食安全"],
+        "template": "事件 -> 农业主题 -> 种业 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "002041",
+            "stock_name": "登海种业",
+            "relation_type": "种业龙头",
+            "relation_path": "粮食安全政策 -> 种业需求提升 -> 登海种业受益"
+          },
+          {
+            "stock_code": "600313",
+            "stock_name": "农发种业",
+            "relation_type": "种业企业",
+            "relation_path": "粮食安全政策 -> 种业需求提升 -> 农发种业受益"
+          }
+        ]
+      },
+      {
+        "link_name": "养殖",
+        "keywords": ["养殖", "猪肉", "生猪", "禽类", "饲料"],
+        "template": "事件 -> 农业主题 -> 养殖 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "002714",
+            "stock_name": "牧原股份",
+            "relation_type": "生猪养殖龙头",
+            "relation_path": "猪价回升 -> 养殖利润改善 -> 牧原股份受益"
+          },
+          {
+            "stock_code": "300498",
+            "stock_name": "温氏股份",
+            "relation_type": "养殖龙头",
+            "relation_path": "猪价回升 -> 养殖利润改善 -> 温氏股份受益"
+          }
+        ]
+      },
+      {
+        "link_name": "农产品加工",
+        "keywords": ["农产品", "加工", "粮油", "饲料", "食品加工"],
+        "template": "事件 -> 农业主题 -> 农产品加工 -> 上市公司",
+        "stocks": [
+          {
+            "stock_code": "000895",
+            "stock_name": "双汇发展",
+            "relation_type": "肉制品龙头",
+            "relation_path": "消费复苏 -> 肉制品需求提升 -> 双汇发展受益"
+          }
+        ]
+      }
+    ],
+    "stocks": [
+      {
+        "stock_code": "002714",
+        "stock_name": "牧原股份",
+        "relation_type": "生猪养殖龙头",
+        "relation_path": "猪价回升 -> 养殖利润改善 -> 牧原股份受益"
+      },
+      {
+        "stock_code": "300498",
+        "stock_name": "温氏股份",
+        "relation_type": "养殖龙头",
+        "relation_path": "猪价回升 -> 养殖利润改善 -> 温氏股份受益"
+      },
+      {
+        "stock_code": "002041",
+        "stock_name": "登海种业",
+        "relation_type": "种业龙头",
+        "relation_path": "粮食安全政策 -> 种业需求提升 -> 登海种业受益"
+      },
+      {
+        "stock_code": "000895",
+        "stock_name": "双汇发展",
+        "relation_type": "肉制品龙头",
+        "relation_path": "消费复苏 -> 肉制品需求提升 -> 双汇发展受益"
+      }
+    ]
   }
 }

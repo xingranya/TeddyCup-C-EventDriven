@@ -19,6 +19,9 @@
 # 激活虚拟环境
 source .venv/bin/activate
 
+# 配置 Tushare 凭证
+export TUSHARE_TOKEN=你的_TOKEN
+
 # 周度实测（竞赛提交用）
 python main_weekly.py --asof 2026-04-20
 
@@ -47,3 +50,9 @@ pipeline/
 ├── backtest.py              # 回测引擎
 └── models.py               # 数据模型
 ```
+
+## 当前运行约束
+
+- 默认使用 `data/events/*` 中的正式事件导入文件
+- Tushare 权限不足时，交易日历和财务部分会切换到公开源或代理口径
+- `result.xlsx` 固定输出三列：事件名称、标的（股票）代码、资金比例

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
 from pipeline.models import AppConfig
-from pipeline.utils import logistic, normalize_text, save_dataframe
+from pipeline.utils import logistic, normalize_text, resolve_event_anchor_trade_date, save_dataframe
 
 
 def run_impact_estimation(
@@ -16,6 +16,7 @@ def run_impact_estimation(
     stock_df: pd.DataFrame,
     price_df: pd.DataFrame,
     benchmark_df: pd.DataFrame,
+    trading_calendar: list[date],
     financial_df: pd.DataFrame,
     output_dir,
     config: AppConfig,
@@ -27,7 +28,7 @@ def run_impact_estimation(
             [
                 "event_id",
                 "event_name",
-                "publish_time",
+                "published_at",
                 "subject_type",
                 "industry_type",
                 "sentiment_score",
@@ -46,32 +47,67 @@ def run_impact_estimation(
     )
     if financial_df is not None and not financial_df.empty:
         merged = merged.merge(
-            financial_df[["stock_code", "pe", "pb", "roe", "net_profit_growth", "revenue_growth", "debt_to_asset"]],
+            financial_df[
+                [
+                    "stock_code",
+                    "pe",
+                    "pb",
+                    "turnover_rate",
+                    "roe",
+                    "net_profit_growth",
+                    "revenue_growth",
+                    "debt_to_asset",
+                    "ann_date",
+                    "report_period",
+                    "snapshot_trade_date",
+                ]
+            ],
             on="stock_code",
             how="left",
         )
     else:
-        for col in ["pe", "pb", "roe", "net_profit_growth", "revenue_growth", "debt_to_asset"]:
+        for col in [
+            "pe",
+            "pb",
+            "turnover_rate",
+            "roe",
+            "net_profit_growth",
+            "revenue_growth",
+            "debt_to_asset",
+            "ann_date",
+            "report_period",
+            "snapshot_trade_date",
+        ]:
             merged[col] = None
 
-    merged["publish_time"] = pd.to_datetime(merged["publish_time"])
+    merged["published_at"] = pd.to_datetime(merged["published_at"])
     benchmark_returns = prepare_return_series(benchmark_df)
     stock_returns = prepare_return_series(price_df)
 
+    # 计算自适应缩放因子
+    historical_car_std = _estimate_historical_car_volatility(price_df, benchmark_df)
+    adaptive_scale = min(0.25, max(0.10, historical_car_std * 2.5)) if historical_car_std > 0 else 0.18
+
     predictions: list[dict[str, Any]] = []
     for _, row in merged.iterrows():
-        event_date = row["publish_time"].date()
+        anchor_date = resolve_event_anchor_trade_date(
+            trading_calendar,
+            pd.Timestamp(row["published_at"]).to_pydatetime(),
+            config.market_close_time,
+        )
+        if anchor_date is None:
+            continue
         stock_history = stock_returns[stock_returns["stock_code"] == row["stock_code"]].copy()
         benchmark_history = benchmark_returns[benchmark_returns["stock_code"] == config.benchmark_code].copy()
 
-        regression_stats = estimate_market_model(stock_history, benchmark_history, event_date)
+        regression_stats = estimate_market_model(stock_history, benchmark_history, anchor_date)
         event_score = round(
             0.3 * row["heat_score"] + 0.35 * row["intensity_score"] + 0.2 * row["scope_score"] + 0.15 * row["confidence_score"],
             4,
         )
         liquidity_score = min(1.0, float(row["avg_turnover_million"]) / 600)
         sentiment_direction = 1 if row["sentiment_score"] >= 0 else -1
-        market_state = compute_market_state(benchmark_history, event_date)
+        market_state = compute_market_state(benchmark_history, anchor_date)
         subject_multiplier = subject_bias(row["subject_type"])
         residual_risk = regression_stats["residual_volatility"]
         fundamental_score = compute_fundamental_score(row)
@@ -83,7 +119,7 @@ def run_impact_estimation(
             * (0.55 + market_state)
             * max(0.15, 1 - residual_risk)
             * (1 + fundamental_score * 0.15)
-            * 0.18,
+            * adaptive_scale,
             4,
         )
         ar_1d = round(expected_car_4d * (0.22 + 0.18 * liquidity_score), 4)
@@ -109,12 +145,21 @@ def run_impact_estimation(
             - config.raw["scoring"]["prediction"]["risk_penalty"] * risk_penalty,
             4,
         )
+        # 生成包含详细数值的逻辑链
+        logic_chain = (
+            f"事件「{row['event_name']}」(热度{row['heat_score']:.2f}, 强度{row['intensity_score']:.2f}) → "
+            f"关联「{row['stock_name']}」(关联度{row['association_score']:.2f}) → "
+            f"预期CAR {expected_car_4d:+.2%} → "
+            f"综合评分 {prediction_score:.3f}"
+        )
+
         predictions.append(
             {
                 "event_id": row["event_id"],
                 "event_name": row["event_name"],
                 "stock_code": row["stock_code"],
                 "stock_name": row["stock_name"],
+                "anchor_trade_date": anchor_date.isoformat(),
                 "ar_1d": ar_1d,
                 "car_2d": car_2d,
                 "car_4d": expected_car_4d,
@@ -125,17 +170,48 @@ def run_impact_estimation(
                 "liquidity_score": round(liquidity_score, 4),
                 "risk_penalty": risk_penalty,
                 "pseudoconfidence": pseudoconfidence,
-                "logic_chain": build_logic_chain(row),
+                "logic_chain": logic_chain,
                 "beta": regression_stats["beta"],
                 "residual_volatility": regression_stats["residual_volatility"],
             }
         )
 
-    prediction_df = pd.DataFrame(predictions).sort_values(
-        ["prediction_score", "pseudoconfidence"], ascending=[False, False]
-    ).reset_index(drop=True)
+    prediction_df = pd.DataFrame(predictions)
+    if prediction_df.empty:
+        prediction_df = _build_empty_prediction_df()
+    else:
+        prediction_df = prediction_df.sort_values(
+            ["prediction_score", "pseudoconfidence"], ascending=[False, False]
+        ).reset_index(drop=True)
     save_dataframe(prediction_df, output_dir / "predictions")
     return prediction_df
+
+
+def _build_empty_prediction_df() -> pd.DataFrame:
+    """返回空的预测结果结构。"""
+
+    return pd.DataFrame(
+        columns=[
+            "event_id",
+            "event_name",
+            "stock_code",
+            "stock_name",
+            "anchor_trade_date",
+            "ar_1d",
+            "car_2d",
+            "car_4d",
+            "direction",
+            "prediction_score",
+            "event_score",
+            "fundamental_score",
+            "liquidity_score",
+            "risk_penalty",
+            "pseudoconfidence",
+            "logic_chain",
+            "beta",
+            "residual_volatility",
+        ]
+    )
 
 
 def prepare_return_series(price_df: pd.DataFrame) -> pd.DataFrame:
@@ -199,13 +275,32 @@ def subject_bias(subject_type: str) -> float:
     return mapping.get(subject_type, 1.0)
 
 
-def _normalize_pe(pe: float | None) -> float:
-    """PE合理区间得分，0~1。"""
-    if pe is None:
+def _normalize_pe(pe: float | None, sector_median_pe: float | None = None) -> float:
+    """PE合理区间得分，0~1。
+
+    Args:
+        pe: 市盈率值
+        sector_median_pe: 行业中位数PE，用于相对评分。如果为None则使用绝对阈值
+    """
+    if pe is None or pd.isna(pe):
         return 0.5
     try:
         v = float(pe)
-        if v <= 0 or v > 150:
+        if v < 0:
+            return 0.1  # 亏损企业
+        # 如果有行业中位数，使用相对评分
+        if sector_median_pe is not None and sector_median_pe > 0:
+            ratio = v / sector_median_pe
+            if 0.5 <= ratio <= 1.5:  # 合理区间
+                return 0.6 + 0.4 * (1 - abs(ratio - 1.0) / 0.5)
+            elif ratio > 3.0:
+                return 0.1
+            elif ratio > 1.5:
+                return 0.4
+            else:
+                return 0.5
+        # fallback到现有逻辑（保留不变）
+        if v > 150:
             return 0.0
         if v < 10:
             return 0.3 + (10 - v) / 10 * 0.3
@@ -218,14 +313,31 @@ def _normalize_pe(pe: float | None) -> float:
         return 0.5
 
 
-def _normalize_pb(pb: float | None) -> float:
-    """PB得分，0~1。"""
-    if pb is None:
+def _normalize_pb(pb: float | None, sector_median_pb: float | None = None) -> float:
+    """PB得分，0~1。
+
+    Args:
+        pb: 市净率值
+        sector_median_pb: 行业中位数PB，用于相对评分。如果为None则使用绝对阈值
+    """
+    if pb is None or pd.isna(pb):
         return 0.5
     try:
         v = float(pb)
         if v <= 0:
             return 0.0
+        # 如果有行业中位数，使用相对评分
+        if sector_median_pb is not None and sector_median_pb > 0:
+            ratio = v / sector_median_pb
+            if 0.5 <= ratio <= 1.5:  # 合理区间
+                return 0.6 + 0.4 * (1 - abs(ratio - 1.0) / 0.5)
+            elif ratio > 3.0:
+                return 0.1
+            elif ratio > 1.5:
+                return 0.4
+            else:
+                return 0.5
+        # fallback到现有逻辑（保留不变）
         if v <= 2:
             return 0.7 + (2 - v) / 2 * 0.3
         if v <= 4:
@@ -237,14 +349,31 @@ def _normalize_pb(pb: float | None) -> float:
         return 0.5
 
 
-def _normalize_roe(roe: float | None) -> float:
-    """ROE得分，0~1。"""
-    if roe is None:
+def _normalize_roe(roe: float | None, sector_median_roe: float | None = None) -> float:
+    """ROE得分，0~1。
+
+    Args:
+        roe: 净资产收益率
+        sector_median_roe: 行业中位数ROE，用于相对评分。如果为None则使用绝对阈值
+    """
+    if roe is None or pd.isna(roe):
         return 0.5
     try:
         v = float(roe)
         if v <= 0:
             return 0.0
+        # 如果有行业中位数，使用相对评分
+        if sector_median_roe is not None and sector_median_roe > 0:
+            ratio = v / sector_median_roe
+            if ratio >= 1.5:  # 显著高于行业中位数
+                return 1.0
+            elif ratio >= 1.0:  # 高于行业中位数
+                return 0.7 + (ratio - 1.0) / 0.5 * 0.3
+            elif ratio >= 0.5:  # 低于行业中位数但尚可
+                return 0.4 + (ratio - 0.5) / 0.5 * 0.3
+            else:  # 显著低于行业中位数
+                return ratio / 0.5 * 0.4
+        # fallback到现有逻辑（保留不变）
         if v >= 0.15:
             return 1.0
         if v >= 0.10:
@@ -280,6 +409,48 @@ def compute_fundamental_score(row: pd.Series) -> float:
     roe_score = _normalize_roe(row.get("roe"))
     growth_score = _normalize_growth(row.get("net_profit_growth"))
     return round(0.3 * pe_score + 0.25 * pb_score + 0.25 * roe_score + 0.2 * growth_score, 4)
+
+
+def _estimate_historical_car_volatility(price_df: pd.DataFrame, benchmark_df: pd.DataFrame, window: int = 4) -> float:
+    """估算历史4日累计异常收益的标准差，用于自适应缩放。
+
+    Args:
+        price_df: 股票价格数据
+        benchmark_df: 基准指数数据
+        window: CAR计算窗口天数，默认4日
+
+    Returns:
+        历史CAR标准差，如果数据不足返回0.0
+    """
+    try:
+        # 选择价格数据中出现最多的几只股票
+        stock_counts = price_df['stock_code'].value_counts()
+        sample_stocks = stock_counts.head(min(10, len(stock_counts))).index.tolist()
+
+        all_car = []
+        for sc in sample_stocks:
+            stock_prices = price_df[price_df['stock_code'] == sc].sort_values('trade_date')
+            if len(stock_prices) < 30:
+                continue
+            stock_prices['trade_date'] = pd.to_datetime(stock_prices['trade_date'])
+            stock_ret = stock_prices.set_index('trade_date')['close'].pct_change()
+            # 简单市场调整：用benchmark的return
+            bm = benchmark_df.sort_values('trade_date').copy()
+            bm['trade_date'] = pd.to_datetime(bm['trade_date'])
+            bm = bm.set_index('trade_date')['close'].pct_change()
+            # 对齐日期并计算AR
+            common = stock_ret.index.intersection(bm.index)
+            if len(common) < 20:
+                continue
+            ar = stock_ret[common] - bm[common]
+            car_4d = ar.rolling(window).sum().dropna()
+            all_car.extend(car_4d.tolist())
+
+        if len(all_car) > 50:
+            return float(pd.Series(all_car).std())
+        return 0.0
+    except Exception:
+        return 0.0
 
 
 def build_logic_chain(row: pd.Series) -> str:

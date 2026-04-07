@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 import re
 from datetime import date, datetime, time, timedelta
@@ -18,6 +19,37 @@ SOURCE_WEIGHTS = {
     "qstock": 0.75,
     "import": 0.7,
 }
+
+
+def configure_logging(level: int = logging.INFO) -> None:
+    """初始化项目日志配置。"""
+
+    root_logger = logging.getLogger()
+    if getattr(configure_logging, "_configured", False):
+        root_logger.setLevel(level)
+        return
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s %(levelname)s %(name)s - %(message)s",
+    )
+    setattr(configure_logging, "_configured", True)
+
+
+def normalize_stock_code(value: object) -> str:
+    """将股票代码统一规范为 6 位纯数字格式。"""
+
+    text = str(value or "").strip().upper()
+    if not text or text in {"NAN", "NONE"}:
+        return ""
+    matched = re.search(r"(\d{6})(?:\.(SH|SZ|BJ))?$", text)
+    if matched:
+        return matched.group(1)
+    digits = re.sub(r"\D", "", text)
+    if not digits:
+        return ""
+    if len(digits) >= 6:
+        return digits[-6:]
+    return digits.zfill(6)
 
 
 def ensure_directory(path: Path) -> Path:

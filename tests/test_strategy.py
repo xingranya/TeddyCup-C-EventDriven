@@ -5,11 +5,40 @@ from datetime import date
 
 import pandas as pd
 
-from pipeline.task4_strategy import is_tradeable, next_trading_date, week_last_trading_date
+from pipeline.models import AppConfig
+from pipeline.task4_strategy import allocate_positions, is_tradeable, next_trading_date, week_last_trading_date
 
 
 class StrategyRuleTestCase(unittest.TestCase):
     """策略交易规则测试。"""
+
+    def _build_config(self) -> AppConfig:
+        return AppConfig(
+            raw={
+                "project": {
+                    "timezone": "Asia/Shanghai",
+                    "initial_capital": 100000,
+                    "market_close_time": "15:00:00",
+                },
+                "data": {
+                    "lookback_days": 14,
+                    "benchmark_code": "000300.SH",
+                    "trading_calendar_source": "tushare",
+                    "stock_whitelist_path": "",
+                    "stock_blacklist_path": "",
+                },
+                "tushare": {"token": ""},
+                "strategy": {
+                    "max_positions": 3,
+                    "single_position_max": 0.5,
+                    "single_position_min": 0.2,
+                    "min_listing_days": 60,
+                    "min_avg_turnover_million": 80,
+                    "positive_score_threshold": 0.02,
+                    "min_prediction_score_threshold": -0.01,
+                },
+            }
+        )
 
     def test_next_trading_date_can_fall_on_friday(self) -> None:
         calendar = [
@@ -46,6 +75,22 @@ class StrategyRuleTestCase(unittest.TestCase):
             date(2026, 4, 23),
         ]
         self.assertEqual(week_last_trading_date(calendar, date(2026, 4, 20)), date(2026, 4, 23))
+
+    def test_allocate_positions_respects_bounds_and_sum(self) -> None:
+        config = self._build_config()
+        selected = pd.DataFrame(
+            [
+                {"event_name": "事件A", "stock_code": "600001", "stock_name": "股票A", "final_score": 0.92, "prediction_score": 0.08},
+                {"event_name": "事件B", "stock_code": "600002", "stock_name": "股票B", "final_score": 0.55, "prediction_score": 0.05},
+                {"event_name": "事件C", "stock_code": "600003", "stock_name": "股票C", "final_score": 0.31, "prediction_score": 0.03},
+            ]
+        )
+
+        picks = allocate_positions(selected, config)
+
+        self.assertAlmostEqual(picks["capital_ratio"].sum(), 1.0, places=4)
+        self.assertTrue((picks["capital_ratio"] >= config.position_floor).all())
+        self.assertTrue((picks["capital_ratio"] <= config.position_cap).all())
 
 
 if __name__ == "__main__":

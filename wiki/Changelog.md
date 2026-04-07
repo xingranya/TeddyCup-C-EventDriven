@@ -1,5 +1,17 @@
 # 更新日志
 
+## 2026-04-07 — [竞赛对齐修复](2026-04-07-Competition-Alignment)
+
+### 与赛题要求对齐的关键修复
+
+- **Task 1 配置真正生效**：`workflow.py` 现在显式把 `config.event_taxonomy` 传入 `run_event_identification()`，事件分类体系不再是“改了配置但主流程没用”
+- **Task 2 关联权重配置化**：`task2_relation_mining.py` 改为读取 `scoring.association`，并支持通过 `scoring.association_profiles` 调整不同主体类型的关联结构
+- **Task 3 报告补齐题目要求**：`report_builder.py` 新增“典型事件完整展示”“模型性能实验”“数据来源与限制”，自动报告更贴近竞赛要求
+- **性能实验去前视偏差**：模型性能实验只统计 `<= asof_date` 的周目录，重跑旧周时不会混入未来周结果
+- **Task 4 仓位分配重构**：仓位分配改成“约束分配 + 最大余数法舍入”，严格使用 `single_position_min/single_position_max` 并保证资金比例求和为 1
+- **报告产物名纠偏**：增强阶段失败时，报告只显示真实存在的文件，不再误报未生成的图表或统计文件
+- **导入事件容错增强**：单条坏记录改为 warning + 跳过，只有完全无有效事件时才整批失败，更适合比赛周临近提交时使用
+
 ## 2026-04-02 — 全面优化与竞赛适配升级
 
 ### 关键缺陷修复

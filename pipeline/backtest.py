@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+import logging
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -10,20 +11,25 @@ from pipeline.fetch_data import fetch_price_history, fetch_trading_calendar
 from pipeline.settings import load_config
 from pipeline.task4_strategy import next_trading_date, week_last_trading_date
 from pipeline.workflow import run_weekly_pipeline
-from pipeline.utils import ensure_directory, parse_date, save_dataframe, configure_matplotlib_chinese
+from pipeline.utils import configure_logging, configure_matplotlib_chinese, ensure_directory, parse_date, save_dataframe
 
 # 配置 matplotlib 支持中文显示
 configure_matplotlib_chinese()
+
+logger = logging.getLogger(__name__)
 
 
 def run_backtest(project_root: Path, start_value: str | date, end_value: str | date) -> pd.DataFrame:
     """按赛题规则执行日频周度回测。"""
 
+    configure_logging()
     start_date = parse_date(start_value)
     end_date = parse_date(end_value)
     config = load_config(project_root)
-    trading_calendar = fetch_trading_calendar(
+    trading_calendar_artifacts = fetch_trading_calendar(
         start_date - timedelta(days=7), end_date + timedelta(days=7), config)
+    trading_calendar = trading_calendar_artifacts.calendar
+    logger.info("回测使用交易日历来源：%s", trading_calendar_artifacts.source_name)
     results: list[dict] = []
     joint_mean_car_frames: list[pd.DataFrame] = []
     event_study_stats_frames: list[pd.DataFrame] = []

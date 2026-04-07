@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import sys
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -8,12 +9,14 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import requests
 
 from pipeline.models import AppConfig, RunContext
 from pipeline.utils import (
     ensure_directory,
     load_json,
     normalize_text,
+    normalize_stock_code,
     parse_datetime,
     read_code_list,
     save_dataframe,
@@ -30,6 +33,18 @@ except Exception:  # pragma: no cover - 环境缺依赖时兜底
     ak = None
 
 
+logger = logging.getLogger(__name__)
+
+
+@dataclass(slots=True)
+class TradingCalendarArtifacts:
+    """交易日历获取结果。"""
+
+    calendar: list[date]
+    source_name: str
+    status_note: str
+
+
 @dataclass(slots=True)
 class FetchArtifacts:
     """数据采集阶段产物。"""
@@ -39,14 +54,17 @@ class FetchArtifacts:
     price_df: pd.DataFrame
     benchmark_df: pd.DataFrame
     trading_calendar: list[date]
+    trading_calendar_source_name: str
+    trading_calendar_status_note: str
 
 
 def run_fetch_pipeline(context: RunContext, config: AppConfig) -> FetchArtifacts:
     """采集周度运行所需的真实基础数据。"""
 
     start_date = context.asof_date - timedelta(days=180)
-    trading_calendar = fetch_trading_calendar(
+    trading_calendar_artifacts = fetch_trading_calendar(
         start_date, context.asof_date + timedelta(days=20), config)
+    trading_calendar = trading_calendar_artifacts.calendar
     all_stock_df = fetch_stock_universe(
         context.project_root, context.asof_date, config)
     news_df = fetch_news(context, config, all_stock_df)
@@ -86,6 +104,8 @@ def run_fetch_pipeline(context: RunContext, config: AppConfig) -> FetchArtifacts
         price_df=price_df,
         benchmark_df=benchmark_df,
         trading_calendar=trading_calendar,
+        trading_calendar_source_name=trading_calendar_artifacts.source_name,
+        trading_calendar_status_note=trading_calendar_artifacts.status_note,
     )
 
 
@@ -97,6 +117,92 @@ def require_tushare_client(config: AppConfig):
     if not config.tushare_token:
         raise RuntimeError("未提供 Tushare 凭证，无法执行竞赛模式数据采集。")
     return ts.pro_api(config.tushare_token)
+
+
+def describe_tushare_trade_calendar_error(error: Exception) -> str:
+    """将 Tushare 交易日历异常转换为可读中文提示。"""
+
+    message = str(error).strip()
+    if "没有接口访问权限" in message:
+        return "Tushare 交易日历接口无访问权限，当前账号未开通 trade_cal；将自动改用公开接口或本地缓存。"
+    if "积分" in message and "不足" in message:
+        return "Tushare 交易日历接口权限不足或积分不够；将自动改用公开接口或本地缓存。"
+    if "频" in message and ("限制" in message or "繁忙" in message):
+        return "Tushare 交易日历接口触发频控；将自动改用公开接口或本地缓存。"
+    if not message:
+        return "Tushare 交易日历接口调用失败；将自动改用公开接口或本地缓存。"
+    return f"Tushare 交易日历接口调用失败：{message}；将自动改用公开接口或本地缓存。"
+
+
+def describe_akshare_trade_calendar_error(error: Exception) -> str:
+    """将 Akshare 交易日历异常转换为可读中文提示。"""
+
+    message = str(error).strip()
+    normalized = message.lower()
+    if "mr_eval_context" in normalized or "symbol not found" in normalized:
+        return "Akshare 交易日历依赖的 py_mini_racer 原生库与当前环境不兼容。"
+    if "py_mini_racer" in normalized:
+        return "Akshare 交易日历依赖的 py_mini_racer 运行失败。"
+    if isinstance(error, requests.RequestException):
+        return "Akshare 交易日历公开接口网络请求失败。"
+    if not message:
+        return "Akshare 交易日历公开接口调用失败。"
+    return f"Akshare 交易日历公开接口调用失败：{message}"
+
+
+def normalize_trade_calendar_dataframe(
+    calendar_df: pd.DataFrame,
+    date_column: str,
+    start_date: date,
+    end_date: date,
+) -> pd.DataFrame:
+    """标准化交易日历列并裁剪到目标区间。"""
+
+    normalized = calendar_df.copy()
+    normalized["trade_date"] = pd.to_datetime(normalized[date_column]).dt.date
+    normalized = normalized[
+        (normalized["trade_date"] >= start_date)
+        & (normalized["trade_date"] <= end_date)
+    ].copy()
+    return normalized
+
+
+def decode_trade_calendar_with_internal_mini_racer(payload: str) -> list[dict[str, Any]]:
+    """使用新版 MiniRacer 兼容解码新浪交易日历。"""
+
+    from akshare.stock.cons import hk_js_decode
+    from py_mini_racer._mini_racer import MiniRacer
+
+    js_runtime = MiniRacer()
+    js_runtime.eval(hk_js_decode)
+    decoded = js_runtime.call("d", payload)
+    if not isinstance(decoded, list):
+        raise RuntimeError("Akshare 交易日历解码结果不是列表。")
+    return decoded
+
+
+def fetch_trading_calendar_from_akshare_compat(
+    start_date: date,
+    end_date: date,
+) -> pd.DataFrame:
+    """绕过旧版 py_mini_racer 入口，直接兼容解码新浪交易日历。"""
+
+    response = requests.get(
+        "https://finance.sina.com.cn/realstock/company/klc_td_sh.txt",
+        timeout=10,
+    )
+    response.raise_for_status()
+    payload = response.text.split("=")[1].split(";")[0].replace('"', "")
+    decoded = decode_trade_calendar_with_internal_mini_racer(payload)
+    calendar_df = pd.DataFrame(decoded, columns=["trade_date"])
+    if calendar_df.empty:
+        raise RuntimeError("Akshare 交易日历兼容解码结果为空。")
+    return normalize_trade_calendar_dataframe(
+        calendar_df=calendar_df,
+        date_column="trade_date",
+        start_date=start_date,
+        end_date=end_date,
+    )
 
 
 def load_qstock_module():
@@ -115,7 +221,7 @@ def load_qstock_module():
     return qstock_module
 
 
-def fetch_trading_calendar(start_date: date, end_date: date, config: AppConfig) -> list[date]:
+def fetch_trading_calendar(start_date: date, end_date: date, config: AppConfig) -> TradingCalendarArtifacts:
     """获取交易日历。"""
 
     if config.trading_calendar_source != "tushare":
@@ -133,24 +239,46 @@ def fetch_trading_calendar(start_date: date, end_date: date, config: AppConfig) 
         if calendar_df is not None and not calendar_df.empty:
             calendar_df["trade_date"] = pd.to_datetime(
                 calendar_df["cal_date"], format="%Y%m%d").dt.date
-            return sorted(calendar_df["trade_date"].unique().tolist())
+            return TradingCalendarArtifacts(
+                calendar=sorted(calendar_df["trade_date"].unique().tolist()),
+                source_name="tushare",
+                status_note="交易日历来自 Tushare 实盘接口",
+            )
     except Exception as e1:
-        print(f"[WARN] tushare trading calendar failed: {e1}")
+        logger.warning("%s", describe_tushare_trade_calendar_error(e1))
 
     # 2. 尝试 akshare（捕获 py_mini_racer / 网络等错误）
     if ak is not None:
         try:
             calendar_df = ak.tool_trade_date_hist_sina()
             if calendar_df is not None and not calendar_df.empty:
-                calendar_df["trade_date"] = pd.to_datetime(
-                    calendar_df["trade_date"]).dt.date
-                calendar_df = calendar_df[
-                    (calendar_df["trade_date"] >= start_date)
-                    & (calendar_df["trade_date"] <= end_date)
-                ].copy()
-                return sorted(calendar_df["trade_date"].unique().tolist())
+                calendar_df = normalize_trade_calendar_dataframe(
+                    calendar_df=calendar_df,
+                    date_column="trade_date",
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+                return TradingCalendarArtifacts(
+                    calendar=sorted(calendar_df["trade_date"].unique().tolist()),
+                    source_name="akshare",
+                    status_note="交易日历来自 Akshare 公开接口",
+                )
         except Exception as e2:
-            print(f"[WARN] akshare trading calendar failed: {e2}")
+            logger.warning("%s，尝试兼容模式继续获取。", describe_akshare_trade_calendar_error(e2))
+            try:
+                calendar_df = fetch_trading_calendar_from_akshare_compat(start_date, end_date)
+                if not calendar_df.empty:
+                    logger.info("Akshare 交易日历兼容模式获取成功，共 %s 个交易日。", len(calendar_df))
+                    return TradingCalendarArtifacts(
+                        calendar=sorted(calendar_df["trade_date"].unique().tolist()),
+                        source_name="akshare_compat",
+                        status_note="交易日历来自 Akshare 兼容模式公开接口",
+                    )
+            except Exception as e3:
+                logger.warning(
+                    "Akshare 交易日历兼容模式也失败：%s，将尝试本地缓存。",
+                    describe_akshare_trade_calendar_error(e3),
+                )
 
     # 3. 从本地缓存加载（扫描 data/raw/*/trading_calendar_*.csv）
     try:
@@ -184,15 +312,23 @@ def fetch_trading_calendar(start_date: date, end_date: date, config: AppConfig) 
                 ].copy()
                 result = sorted(combined["trade_date"].unique().tolist())
                 if result:
-                    print(f"[INFO] 使用本地缓存交易日历，共 {len(result)} 个交易日")
-                    return result
-    except Exception as e3:
-        print(f"[WARN] local calendar cache failed: {e3}")
+                    logger.info("使用本地缓存交易日历，共 %s 个交易日。", len(result))
+                    return TradingCalendarArtifacts(
+                        calendar=result,
+                        source_name="local_cache",
+                        status_note="交易日历来自本地缓存",
+                    )
+    except Exception as e4:
+        logger.warning("本地缓存交易日历读取失败：%s", e4)
 
     # 4. 最终兜底：使用 pandas bdate_range 生成工作日列表（不含周末）
-    print("[WARN] 所有交易日历数据源均不可用，使用工作日列表作为兜底（不含节假日调整）")
+    logger.warning("所有交易日历数据源均不可用，使用工作日列表兜底（不含节假日调整）。")
     bdate_series = pd.bdate_range(start=start_date, end=end_date)
-    return [d.date() for d in bdate_series]
+    return TradingCalendarArtifacts(
+        calendar=[d.date() for d in bdate_series],
+        source_name="business_day_fallback",
+        status_note="交易日历已降级为工作日列表，不含中国节假日修正",
+    )
 
 
 def fetch_news(context: RunContext, config: AppConfig, stock_df: pd.DataFrame) -> pd.DataFrame:
@@ -278,7 +414,7 @@ def fetch_news(context: RunContext, config: AppConfig, stock_df: pd.DataFrame) -
         try:
             rows.extend(_fetch_akshare_news(context, config, stock_df))
         except Exception as e:
-            print(f"[WARN] akshare news fetch failed: {e}")
+            logger.warning("Akshare 新闻采集失败。", exc_info=e)
 
     if not rows:
         raise RuntimeError(
@@ -326,6 +462,7 @@ def load_imported_event_records(
         return []
 
     rows: list[dict[str, Any]] = []
+    skipped_count = 0
     for path in sorted(import_dir.iterdir()):
         if path.suffix.lower() == ".json":
             payload = load_json(path)
@@ -351,8 +488,15 @@ def load_imported_event_records(
                 or raw_record.get("日期")
             )
             if not title or not content or not published_value:
-                raise RuntimeError(f"导入事件文件缺少必填字段：{path}")
-            published_at = parse_datetime(str(published_value))
+                skipped_count += 1
+                logger.warning("跳过导入事件记录：文件 %s 缺少必填字段。", path)
+                continue
+            try:
+                published_at = parse_datetime(str(published_value))
+            except Exception as exc:
+                skipped_count += 1
+                logger.warning("跳过导入事件记录：文件 %s 的发布时间无法解析。", path, exc_info=exc)
+                continue
             if not (lookback_start <= published_at.date() <= asof_date):
                 continue
             rows.append(
@@ -373,6 +517,8 @@ def load_imported_event_records(
                     collected_at=collected_at,
                 )
             )
+    if skipped_count:
+        logger.warning("导入事件阶段共跳过 %s 条异常记录。", skipped_count)
     return rows
 
 
@@ -466,7 +612,7 @@ def _fetch_akshare_news(
                     )
                 )
     except Exception as e:
-        print(f"[WARN] akshare stock_info_global_em failed: {e}")
+        logger.warning("Akshare 东方财富快讯获取失败。", exc_info=e)
 
     # 尝试财联社新闻
     try:
@@ -503,7 +649,7 @@ def _fetch_akshare_news(
                     )
                 )
     except Exception as e:
-        print(f"[WARN] akshare stock_info_global_cls failed: {e}")
+        logger.warning("Akshare 财联社快讯获取失败。", exc_info=e)
 
     # 尝试新浪财经
     try:
@@ -543,7 +689,7 @@ def _fetch_akshare_news(
                     )
                 )
     except Exception as e:
-        print(f"[WARN] akshare stock_info_global_sina failed: {e}")
+        logger.warning("Akshare 新浪财经快讯获取失败。", exc_info=e)
 
     return rows
 
@@ -580,8 +726,7 @@ def fetch_stock_universe(project_root: Path, asof_date: date, config: AppConfig)
             )
 
             stock_df = basic_df.merge(company_df, on="ts_code", how="left")
-            stock_df["stock_code"] = stock_df["symbol"].astype(
-                str).str.zfill(6)
+            stock_df["stock_code"] = stock_df["symbol"].map(normalize_stock_code)
             stock_df["stock_name"] = stock_df["name"].astype(str)
             stock_df["industry"] = stock_df["industry"].fillna("未知行业")
             stock_df["concept_tags"] = ""
@@ -606,8 +751,7 @@ def fetch_stock_universe(project_root: Path, asof_date: date, config: AppConfig)
         if not manual_path.exists():
             raise RuntimeError("未获取到股票池数据，且本地无可用候选池缓存。")
         stock_df = pd.read_csv(manual_path)
-        stock_df["stock_code"] = stock_df["stock_code"].astype(
-            str).str.zfill(6)
+        stock_df["stock_code"] = stock_df["stock_code"].map(normalize_stock_code)
         stock_df["stock_name"] = stock_df["stock_name"].astype(str)
         stock_df["industry"] = stock_df["industry"].fillna("未知行业")
         stock_df["concept_tags"] = stock_df["concept_tags"].fillna("")
@@ -1180,7 +1324,7 @@ def normalize_tushare_date(value: Any) -> str:
 def to_tushare_code(stock_code: str) -> str:
     """将裸代码转换为 Tushare 代码。"""
 
-    normalized_code = str(stock_code).zfill(6)
+    normalized_code = normalize_stock_code(stock_code)
     if normalized_code.startswith(("6", "9")):
         return f"{normalized_code}.SH"
     if normalized_code.startswith("8"):

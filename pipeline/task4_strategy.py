@@ -1,20 +1,27 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+import logging
+import math
 from typing import Any
 
 import pandas as pd
 
 from pipeline.models import AppConfig
-from pipeline.utils import logistic, save_dataframe
+from pipeline.utils import logistic, normalize_stock_code, save_dataframe
+
+
+logger = logging.getLogger(__name__)
 
 
 def _compute_momentum(stock_code: str, price_df: pd.DataFrame, asof_date, n_days: int = 5) -> float:
     """计算股票近n日涨幅。"""
     if price_df is None or price_df.empty:
         return 0.0
-    stock_prices = price_df[price_df['stock_code']
-                            == stock_code].sort_values('trade_date')
+    normalized_code = normalize_stock_code(stock_code)
+    price_meta = price_df.copy()
+    price_meta["stock_code"] = price_meta["stock_code"].map(normalize_stock_code)
+    stock_prices = price_meta[price_meta["stock_code"] == normalized_code].sort_values('trade_date')
     # 取asof_date之前的数据
     stock_prices = stock_prices[stock_prices['trade_date'] <= str(asof_date)]
     if len(stock_prices) < n_days + 1:
@@ -37,15 +44,21 @@ def run_strategy_construction(
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """生成周度投资决策。"""
 
-    merged = prediction_df.merge(
-        stock_df[["stock_code", "stock_name", "listed_date",
+    prediction_meta = prediction_df.copy()
+    prediction_meta["stock_code"] = prediction_meta["stock_code"].map(normalize_stock_code)
+    stock_meta = stock_df.copy()
+    stock_meta["stock_code"] = stock_meta["stock_code"].map(normalize_stock_code)
+    merged = prediction_meta.merge(
+        stock_meta[["stock_code", "stock_name", "listed_date",
                   "is_st", "avg_turnover_million"]],
         on=["stock_code", "stock_name"],
         how="left",
     )
     if financial_df is not None and not financial_df.empty:
+        financial_meta = financial_df.copy()
+        financial_meta["stock_code"] = financial_meta["stock_code"].map(normalize_stock_code)
         merged = merged.merge(
-            financial_df[["stock_code", "pe",
+            financial_meta[["stock_code", "pe",
                           "pb", "roe", "net_profit_growth"]],
             on="stock_code",
             how="left",
@@ -100,10 +113,12 @@ def run_strategy_construction(
 
     # 空仓保护：如果最终选中标的的预期收益全为负，不操作
     if not final_picks.empty:
-        min_score_threshold = -0.01  # 可配置
+        min_score_threshold = config.min_prediction_score_threshold
         if final_picks["prediction_score"].max() < min_score_threshold:
-            print(
-                f"[STRATEGY] 所有候选标的预期收益为负(max={final_picks['prediction_score'].max():.4f})，本周空仓")
+            logger.info(
+                "所有候选标的预期收益均低于阈值 %.4f，触发本周空仓。",
+                min_score_threshold,
+            )
             final_picks = final_picks.iloc[0:0]  # 清空但保留列结构
 
     if final_picks.empty:
@@ -179,6 +194,7 @@ def pass_fundamental_filter(row: pd.Series) -> bool:
 def is_tradeable(stock_code: str, asof_date: date, trading_calendar: list[date], suspend_resume_df: pd.DataFrame) -> bool:
     """检查本周是否满足交易日与停牌约束。"""
 
+    normalized_code = normalize_stock_code(stock_code)
     buy_date = next_trading_date(trading_calendar, asof_date, target_weekday=1)
     if buy_date is None:
         return False
@@ -187,7 +203,9 @@ def is_tradeable(stock_code: str, asof_date: date, trading_calendar: list[date],
         return False
 
     if suspend_resume_df is not None and not suspend_resume_df.empty:
-        stock_suspend = suspend_resume_df[suspend_resume_df["stock_code"] == stock_code]
+        suspend_meta = suspend_resume_df.copy()
+        suspend_meta["stock_code"] = suspend_meta["stock_code"].map(normalize_stock_code)
+        stock_suspend = suspend_meta[suspend_meta["stock_code"] == normalized_code]
         for _, sr in stock_suspend.iterrows():
             s_date = sr.get("suspend_date")
             r_date = sr.get("resume_date")
@@ -286,28 +304,129 @@ def allocate_positions(selected: pd.DataFrame, config: AppConfig) -> pd.DataFram
                     picks.loc[top_idx, "capital_ratio"] += 0.05
 
     if len(picks) > 1:
-        # 仓位下限从 20% 调整为 15%，上限保持 50%
-        position_floor = getattr(config, "position_floor_new", 0.15)
-        picks["capital_ratio"] = picks["capital_ratio"].clip(
-            lower=position_floor, upper=config.position_cap)
-        picks["capital_ratio"] = picks["capital_ratio"] / \
-            picks["capital_ratio"].sum()
-        picks["capital_ratio"] = picks["capital_ratio"].clip(
-            lower=position_floor, upper=config.position_cap)
-        picks["capital_ratio"] = picks["capital_ratio"] / \
-            picks["capital_ratio"].sum()
+        bounded_weights = _allocate_constrained_weights(
+            raw_weights=picks["capital_ratio"].tolist(),
+            floor=config.position_floor,
+            cap=config.position_cap,
+        )
+        picks["capital_ratio"] = _round_weights_largest_remainder(
+            bounded_weights,
+            digits=4,
+            floor=config.position_floor,
+            cap=config.position_cap,
+        )
     else:
         picks["capital_ratio"] = 1.0
 
     picks = picks.sort_values(
         "capital_ratio", ascending=False).reset_index(drop=True)
     picks["rank"] = range(1, len(picks) + 1)
-    picks["capital_ratio"] = picks["capital_ratio"].round(4)
-    diff = round(1 - picks["capital_ratio"].sum(), 4)
-    if not picks.empty and diff != 0:
-        picks.loc[0, "capital_ratio"] = round(
-            picks.loc[0, "capital_ratio"] + diff, 4)
     return picks[["event_name", "stock_code", "capital_ratio", "rank", "stock_name", "prediction_score"]]
+
+
+def _allocate_constrained_weights(raw_weights: list[float], floor: float, cap: float) -> list[float]:
+    """在上下限约束下分配权重。"""
+
+    count = len(raw_weights)
+    if count == 0:
+        return []
+    if count == 1:
+        return [1.0]
+
+    lower_bound = min(max(floor, 0.0), 1.0 / count)
+    upper_bound = max(cap, 1.0 / count)
+    upper_bound = min(1.0, upper_bound)
+    if upper_bound * count < 1.0:
+        upper_bound = 1.0
+    if lower_bound > upper_bound:
+        lower_bound = upper_bound
+
+    normalized = [max(float(weight), 1e-8) for weight in raw_weights]
+    total = sum(normalized) or float(count)
+    normalized = [weight / total for weight in normalized]
+
+    result = [0.0] * count
+    remaining = 1.0
+    unresolved = set(range(count))
+
+    while unresolved:
+        unresolved_total = sum(normalized[idx] for idx in unresolved)
+        changed = False
+        for idx in list(unresolved):
+            proposed = (
+                remaining * normalized[idx] / unresolved_total
+                if unresolved_total > 0
+                else remaining / len(unresolved)
+            )
+            if proposed < lower_bound - 1e-12:
+                result[idx] = lower_bound
+                remaining -= lower_bound
+                unresolved.remove(idx)
+                changed = True
+            elif proposed > upper_bound + 1e-12:
+                result[idx] = upper_bound
+                remaining -= upper_bound
+                unresolved.remove(idx)
+                changed = True
+        if not changed:
+            break
+
+    unresolved_total = sum(normalized[idx] for idx in unresolved)
+    for idx in unresolved:
+        if unresolved_total > 0:
+            result[idx] = remaining * normalized[idx] / unresolved_total
+        else:
+            result[idx] = remaining / len(unresolved)
+
+    return result
+
+
+def _round_weights_largest_remainder(
+    weights: list[float],
+    digits: int,
+    floor: float,
+    cap: float,
+) -> list[float]:
+    """使用最大余数法将权重稳定舍入，同时保持和为 1。"""
+
+    if not weights:
+        return []
+    if len(weights) == 1:
+        return [1.0]
+
+    scale = 10 ** digits
+    upper_units = int(round(cap * scale))
+    exact_units = [weight * scale for weight in weights]
+    rounded_units = [int(math.floor(unit + 1e-12)) for unit in exact_units]
+    remaining_units = scale - sum(rounded_units)
+    order = sorted(
+        range(len(weights)),
+        key=lambda idx: (exact_units[idx] - rounded_units[idx], exact_units[idx]),
+        reverse=True,
+    )
+
+    for idx in order:
+        if remaining_units <= 0:
+            break
+        if rounded_units[idx] >= upper_units:
+            continue
+        rounded_units[idx] += 1
+        remaining_units -= 1
+
+    while remaining_units > 0:
+        progressed = False
+        for idx in order:
+            if rounded_units[idx] >= upper_units:
+                continue
+            rounded_units[idx] += 1
+            remaining_units -= 1
+            progressed = True
+            if remaining_units == 0:
+                break
+        if not progressed:
+            break
+
+    return [round(unit / scale, digits) for unit in rounded_units]
 
 
 def build_pick_reason(row: pd.Series, tradable: pd.DataFrame, event_df: pd.DataFrame) -> str:

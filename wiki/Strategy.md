@@ -23,12 +23,15 @@
 
 ## 仓位分配
 
-按预测得分加权分配：
+当前仓位分配不是简单的“算完比例直接 round”，而是：
 
 ```python
-capital_ratio = prediction_score / Σ(prediction_scores)
-# 限制每只股票比例在 20%~50% 之间
+1. 先按得分归一化
+2. 再做 single_position_min / single_position_max 约束分配
+3. 最后用最大余数法舍入，保证资金比例求和稳定为 1
 ```
+
+这样做的原因，是为了解决此前“配置值和实际下限不一致、四舍五入后总和可能漂移”的问题，使提交到 `result.xlsx` 的资金比例更稳定地符合竞赛要求。
 
 ## 回测机制
 

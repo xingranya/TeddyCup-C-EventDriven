@@ -11,6 +11,10 @@
 
 关联强度 = Σ(维度权重 × 维度得分)，低于 0.2 的关系被过滤。
 
+当前基础权重由 `config/config.yaml` 中的 `scoring.association` 控制；若需要按事件驱动主体类型做差异化调整，则通过 `scoring.association_profiles` 配置倍率后再归一化。
+
+这次修复前，配置文件里的关联权重和实际代码行为并不一致；现在已经收敛成真正的配置驱动口径。
+
 ## 产业链映射
 
 `data/manual/industry_relation_map.json` 定义了五类主题的完整产业链：

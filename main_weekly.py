@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 import warnings
 from pathlib import Path
@@ -20,14 +21,18 @@ except Exception:
 
 from generate_result_xlsx import generate_result_xlsx
 from pipeline.workflow import run_weekly_pipeline
+from pipeline.utils import configure_logging
 
 warnings.filterwarnings("ignore")
 warnings.filterwarnings("ignore", "Glyph.*missing from font", UserWarning)
+
+logger = logging.getLogger(__name__)
 
 
 def main() -> None:
     """周度运行入口。"""
 
+    configure_logging()
     parser = argparse.ArgumentParser(description="泰迪杯 C 题周度运行脚本")
     parser.add_argument("--asof", required=True, help="分析基准日，格式为 YYYY-MM-DD")
     parser.add_argument("--config", default=None, help="配置文件路径")
@@ -39,9 +44,9 @@ def main() -> None:
     result_path = artifacts.context.output_dir / "result.xlsx"
     generate_result_xlsx(final_csv, result_path)
 
-    print(f"周度流程完成：{artifacts.context.output_dir}")
-    print(f"报告路径：{artifacts.report_path}")
-    print(f"提交文件：{result_path}")
+    logger.info("周度流程完成：%s", artifacts.context.output_dir)
+    logger.info("报告路径：%s", artifacts.report_path)
+    logger.info("提交文件：%s", result_path)
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ import networkx as nx
 import pandas as pd
 
 from pipeline.models import AppConfig
-from pipeline.utils import load_json, normalize_text, save_dataframe, configure_matplotlib_chinese
+from pipeline.utils import configure_matplotlib_chinese, load_json, normalize_stock_code, normalize_text, save_dataframe
 
 # 配置 matplotlib 支持中文显示
 configure_matplotlib_chinese()
@@ -29,18 +29,6 @@ INDUSTRY_LABEL_MAP = {
 }
 
 
-# 关联权重配置：根据事件驱动主体类型动态调整
-WEIGHT_PROFILES = {
-    "政策类事件": {"direct": 0.30, "business": 0.25, "industry": 0.35, "co_move": 0.10},
-    "公司类事件": {"direct": 0.55, "business": 0.20, "industry": 0.15, "co_move": 0.10},
-    "行业类事件": {"direct": 0.35, "business": 0.30, "industry": 0.25, "co_move": 0.10},
-    "宏观类事件": {"direct": 0.25, "business": 0.20, "industry": 0.35, "co_move": 0.20},
-    "地缘类事件": {"direct": 0.30, "business": 0.20, "industry": 0.35, "co_move": 0.15},
-}
-DEFAULT_WEIGHTS = {"direct": 0.45, "business": 0.25,
-                   "industry": 0.20, "co_move": 0.10}
-
-
 def run_relation_mining(
     event_df: pd.DataFrame,
     stock_df: pd.DataFrame,
@@ -55,6 +43,8 @@ def run_relation_mining(
         project_root / "data/manual/industry_relation_map.json")
     price_returns = compute_returns(price_df)
     relations: list[dict[str, Any]] = []
+    stock_meta = stock_df.copy()
+    stock_meta["stock_code"] = stock_meta["stock_code"].map(normalize_stock_code)
 
     for _, event in event_df.iterrows():
         event_text = f"{event['event_name']} {event['raw_evidence']}"
@@ -67,29 +57,28 @@ def run_relation_mining(
             for item in industry_payload.get("stocks", [])
         }
 
-        for _, stock in stock_df.iterrows():
+        for _, stock in stock_meta.iterrows():
             direct_mention = 1.0 if normalize_text(
                 stock["stock_name"]) in normalized_event_text else 0.0
             business_match = compute_business_match(event_text, stock)
             industry_overlap = compute_industry_overlap(
                 event["industry_type"], stock)
             historical_co_move = compute_historical_co_move(
-                stock["stock_code"], event["industry_type"], price_returns, stock_df
+                stock["stock_code"], event["industry_type"], price_returns, stock_meta
             )
             if stock["stock_code"] in priority_stocks:
                 direct_mention = max(direct_mention, 0.85)
                 business_match = max(business_match, 0.75)
                 industry_overlap = max(industry_overlap, 0.8)
 
-            # 根据事件的 subject_type 获取动态权重
             subject_type = event.get("subject_type", "")
-            weights = WEIGHT_PROFILES.get(subject_type, DEFAULT_WEIGHTS)
+            weights = _resolve_association_weights(config, subject_type)
 
             association_score = round(
-                weights["direct"] * direct_mention
-                + weights["business"] * business_match
-                + weights["industry"] * industry_overlap
-                + weights["co_move"] * historical_co_move,
+                weights["direct_mention"] * direct_mention
+                + weights["business_match"] * business_match
+                + weights["industry_overlap"] * industry_overlap
+                + weights["historical_co_move"] * historical_co_move,
                 4,
             )
             if association_score < 0.2:
@@ -126,6 +115,27 @@ def run_relation_mining(
 
     graph_paths = render_relation_graphs(relation_df, output_dir)
     return relation_df, graph_paths
+
+
+def _resolve_association_weights(config: AppConfig, subject_type: str) -> dict[str, float]:
+    """根据基础权重和主体类型倍率得到最终关联权重。"""
+
+    base_weights = config.association_weights
+    profiles = config.association_weight_profiles
+    default_profile = profiles.get("default", {})
+    subject_profile = profiles.get(subject_type, {})
+    adjusted: dict[str, float] = {}
+    for key, base_value in base_weights.items():
+        multiplier = float(subject_profile.get(key, default_profile.get(key, 1.0)))
+        adjusted[key] = base_value * multiplier
+    total_weight = sum(adjusted.values())
+    if total_weight <= 0:
+        total_weight = sum(base_weights.values()) or 1.0
+        adjusted = base_weights.copy()
+    return {
+        key: value / total_weight
+        for key, value in adjusted.items()
+    }
 
 
 def compute_returns(price_df: pd.DataFrame) -> pd.DataFrame:

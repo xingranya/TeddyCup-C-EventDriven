@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from pipeline.models import AppConfig
-from pipeline.utils import logistic, normalize_text, resolve_event_anchor_trade_date, save_dataframe
+from pipeline.utils import logistic, normalize_stock_code, normalize_text, resolve_event_anchor_trade_date, save_dataframe
 
 
 def run_impact_estimation(
@@ -23,7 +23,11 @@ def run_impact_estimation(
 ) -> pd.DataFrame:
     """基于 A 股简化事件研究思想估计未来影响。"""
 
-    merged = relation_df.merge(
+    relation_meta = relation_df.copy()
+    relation_meta["stock_code"] = relation_meta["stock_code"].map(normalize_stock_code)
+    stock_meta = stock_df.copy()
+    stock_meta["stock_code"] = stock_meta["stock_code"].map(normalize_stock_code)
+    merged = relation_meta.merge(
         event_df[
             [
                 "event_id",
@@ -41,14 +45,16 @@ def run_impact_estimation(
         on=["event_id", "event_name"],
         how="left",
     ).merge(
-        stock_df[["stock_code", "stock_name",
+        stock_meta[["stock_code", "stock_name",
                   "industry", "avg_turnover_million"]],
         on=["stock_code", "stock_name"],
         how="left",
     )
     if financial_df is not None and not financial_df.empty:
+        financial_meta = financial_df.copy()
+        financial_meta["stock_code"] = financial_meta["stock_code"].map(normalize_stock_code)
         merged = merged.merge(
-            financial_df[
+            financial_meta[
                 [
                     "stock_code",
                     "pe",
@@ -115,7 +121,7 @@ def run_impact_estimation(
         liquidity_score = min(1.0, float(row["avg_turnover_million"]) / 600)
         sentiment_direction = 1 if row["sentiment_score"] >= 0 else -1
         market_state = compute_market_state(benchmark_history, anchor_date)
-        subject_multiplier = subject_bias(row["subject_type"])
+        subject_multiplier = subject_bias(row["subject_type"], config)
         residual_risk = regression_stats["residual_volatility"]
         fundamental_score = compute_fundamental_score(row)
         expected_car_4d = round(
@@ -171,6 +177,9 @@ def run_impact_estimation(
                 "event_name": row["event_name"],
                 "stock_code": row["stock_code"],
                 "stock_name": row["stock_name"],
+                "subject_type": row["subject_type"],
+                "relation_type": row.get("relation_type", ""),
+                "association_score": round(float(row["association_score"]), 4),
                 "anchor_trade_date": anchor_date.isoformat(),
                 "ar_1d": ar_1d,
                 "car_2d": car_2d,
@@ -208,6 +217,9 @@ def _build_empty_prediction_df() -> pd.DataFrame:
             "event_name",
             "stock_code",
             "stock_name",
+            "subject_type",
+            "relation_type",
+            "association_score",
             "anchor_trade_date",
             "ar_1d",
             "car_2d",
@@ -279,16 +291,10 @@ def compute_market_state(benchmark_history: pd.DataFrame, event_date) -> float:
     return round(float(np.clip(0.5 + recent_return * 8, 0.1, 0.9)), 4)
 
 
-def subject_bias(subject_type: str) -> float:
+def subject_bias(subject_type: str, config: AppConfig) -> float:
     """不同事件主体的偏置因子。"""
 
-    mapping = {
-        "政策类事件": 1.08,
-        "公司类事件": 1.12,
-        "行业类事件": 1.0,
-        "宏观类事件": 0.92,
-        "地缘类事件": 1.15,
-    }
+    mapping = config.subject_bias_map
     return mapping.get(subject_type, 1.0)
 
 

@@ -42,6 +42,14 @@ run_weekly_pipeline (workflow.py)
 └── report_builder → report.md + result.xlsx
 ```
 
+## 本轮架构收口点
+
+- `workflow.py` 现在会把 `config.event_taxonomy` 显式传给 Task 1，保证分类体系与配置一致
+- `task2_relation_mining.py` 的关联基础权重改为读取配置，不再和 `config.yaml` 脱节
+- `task3_impact_estimate.py` 在预测输出中补齐 `subject_type`、`relation_type`、`association_score` 等报告所需字段
+- `report_builder.py` 新增典型事件展示、模型性能实验和数据来源限制章节
+- 报告只会列出真实存在的增强产物文件，增强阶段失败时不会误报文件名
+
 ## 关键配置
 
 | 参数 | 值 | 说明 |

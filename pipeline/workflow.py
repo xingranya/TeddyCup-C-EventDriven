@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+import logging
 from pathlib import Path
 
 import pandas as pd
@@ -16,7 +17,10 @@ from pipeline.task1_event_identify import run_event_identification
 from pipeline.task2_relation_mining import run_relation_mining
 from pipeline.task3_impact_estimate import run_impact_estimation
 from pipeline.task4_strategy import run_strategy_construction
-from pipeline.utils import ensure_directory, parse_date, save_dataframe
+from pipeline.utils import configure_logging, ensure_directory, parse_date, save_dataframe
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -38,6 +42,7 @@ class WorkflowArtifacts:
 def run_weekly_pipeline(project_root: Path, asof_value: str | date, config_path: str | None = None) -> WorkflowArtifacts:
     """执行一轮完整周度流程。"""
 
+    configure_logging()
     config = load_config(project_root, config_path)
     asof_date = parse_date(asof_value)
     output_dir = ensure_directory(
@@ -58,16 +63,20 @@ def run_weekly_pipeline(project_root: Path, asof_value: str | date, config_path:
     try:
         fetch_artifacts = run_fetch_pipeline(context, config)
     except Exception as e:
-        print(f"[ERROR] fetch step failed: {e}")
+        logger.exception("fetch 阶段失败。")
         raise  # fetch 是基础步骤，失败则无法继续
 
     # event_identify step
     try:
-        event_df = run_event_identification(fetch_artifacts.news_df)
+        event_df = run_event_identification(
+            fetch_artifacts.news_df,
+            event_taxonomy=config.event_taxonomy,
+        )
     except Exception as e:
-        print(f"[ERROR] event_identify step failed: {e}")
+        logger.exception("event_identify 阶段失败。")
         event_df = pd.DataFrame()
     save_dataframe(event_df, processed_dir / "event_candidates")
+    logger.info("event_identify 阶段完成：事件数=%s", len(event_df))
 
     # relation_mining step
     try:
@@ -80,9 +89,10 @@ def run_weekly_pipeline(project_root: Path, asof_value: str | date, config_path:
             config=config,
         )
     except Exception as e:
-        print(f"[ERROR] relation_mining step failed: {e}")
+        logger.exception("relation_mining 阶段失败。")
         relation_df = pd.DataFrame()
         graph_paths = []
+    logger.info("relation_mining 阶段完成：关联数=%s，图谱文件数=%s", len(relation_df), len(graph_paths))
 
     # financial_data step
     related_stock_codes = []
@@ -98,7 +108,7 @@ def run_weekly_pipeline(project_root: Path, asof_value: str | date, config_path:
             trading_calendar=fetch_artifacts.trading_calendar,
         )
     except Exception as e:
-        print(f"[ERROR] financial_data step failed: {e}")
+        logger.exception("financial_data 阶段失败。")
         financial_df = pd.DataFrame()
 
     try:
@@ -108,7 +118,7 @@ def run_weekly_pipeline(project_root: Path, asof_value: str | date, config_path:
             config=config,
         )
     except Exception as e:
-        print(f"[ERROR] suspend_resume_data step failed: {e}")
+        logger.exception("suspend_resume_data 阶段失败。")
         suspend_resume_df = pd.DataFrame()
 
     save_dataframe(financial_df, context.raw_dir /
@@ -130,8 +140,9 @@ def run_weekly_pipeline(project_root: Path, asof_value: str | date, config_path:
             config=config,
         )
     except Exception as e:
-        print(f"[ERROR] impact_estimate step failed: {e}")
+        logger.exception("impact_estimate 阶段失败。")
         prediction_df = pd.DataFrame()
+    logger.info("impact_estimate 阶段完成：预测数=%s", len(prediction_df))
 
     # event_study step
     study_dir = output_dir / "event_study"
@@ -146,7 +157,7 @@ def run_weekly_pipeline(project_root: Path, asof_value: str | date, config_path:
             config=config,
         )
     except Exception as e:
-        print(f"[ERROR] event_study step failed: {e}")
+        logger.exception("event_study 阶段失败。")
         from pipeline.event_study_enhanced import EventStudyArtifacts
         event_study_artifacts = EventStudyArtifacts(
             detail_df=pd.DataFrame(),
@@ -169,7 +180,7 @@ def run_weekly_pipeline(project_root: Path, asof_value: str | date, config_path:
             prediction_df=prediction_df,
         )
     except Exception as e:
-        print(f"[ERROR] industry_chain step failed: {e}")
+        logger.exception("industry_chain 阶段失败。")
         from pipeline.industry_chain_enhanced import IndustryChainArtifacts
         industry_chain_artifacts = IndustryChainArtifacts(
             relation_df=pd.DataFrame(),
@@ -194,7 +205,7 @@ def run_weekly_pipeline(project_root: Path, asof_value: str | date, config_path:
             price_df=fetch_artifacts.price_df,
         )
     except Exception as e:
-        print(f"[ERROR] strategy step failed: {e}")
+        logger.exception("strategy 阶段失败。")
         final_picks = pd.DataFrame()
         summary = {
             "asof_date": asof_date.isoformat(),
@@ -204,10 +215,27 @@ def run_weekly_pipeline(project_root: Path, asof_value: str | date, config_path:
             "buy_date": "",
             "sell_date": "",
         }
+    summary.update(
+        {
+            "event_count": int(len(event_df)),
+            "relation_count": int(len(relation_df)),
+            "prediction_count": int(len(prediction_df)),
+            "trading_calendar_source": fetch_artifacts.trading_calendar_source_name,
+            "trading_calendar_status_note": fetch_artifacts.trading_calendar_status_note,
+        }
+    )
+    logger.info(
+        "strategy 阶段完成：候选=%s，入选=%s，fallback=%s，交易日历=%s",
+        summary["candidate_count"],
+        summary["selected_count"],
+        summary["fallback_used"],
+        summary["trading_calendar_source"],
+    )
 
     # report_builder step
     try:
         report_path = build_weekly_report(
+            project_root=project_root,
             asof_date=asof_date,
             event_df=event_df,
             relation_df=relation_df,
@@ -218,10 +246,20 @@ def run_weekly_pipeline(project_root: Path, asof_value: str | date, config_path:
             config=config,
             event_study_artifacts=event_study_artifacts,
             industry_chain_artifacts=industry_chain_artifacts,
+            summary=summary,
         )
     except Exception as e:
-        print(f"[ERROR] report_builder step failed: {e}")
+        logger.exception("report_builder 阶段失败。")
         report_path = output_dir / "report.md"
+
+    logger.info(
+        "周度流程结束：日期=%s，事件=%s，关联=%s，预测=%s，持仓=%s",
+        summary["asof_date"],
+        summary["event_count"],
+        summary["relation_count"],
+        summary["prediction_count"],
+        summary["selected_count"],
+    )
 
     return WorkflowArtifacts(
         context=context,

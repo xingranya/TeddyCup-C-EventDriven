@@ -421,7 +421,7 @@ def _build_data_source_section(config: AppConfig, summary: dict) -> str:
     """生成数据来源与限制章节。"""
 
     qstock_status = "启用" if config.qstock_enabled else "关闭"
-    return f"""- 事件数据：优先读取 `data/events/policy|announcement|industry|macro` 导入文件；qstock 自动采集当前默认 {qstock_status}。
+    return f"""- 事件数据：优先读取项目内“采集 -> 标准化 -> 审核 -> 发布”流程生成的 `data/events/policy|announcement|industry|macro` 正式事件文件；qstock 自动采集当前默认 {qstock_status}。
 - 行情与基准：正式运行优先使用 Tushare，公开接口仅作为降级备选。
 - 财务与停复牌：依赖 Tushare / Akshare 可见口径，实际覆盖度受接口权限、公告披露时点和缓存完整性影响。
 - 交易日历：本次运行使用 `{summary.get('trading_calendar_source', 'unknown')}`，说明为“{summary.get('trading_calendar_status_note', '未记录')}”。

@@ -5,18 +5,12 @@
 ## 快速开始
 
 ```bash
-# 激活虚拟环境（Python 3.12）
+cd /Users/xingranya/Downloads/TeddyCup-C-EventDriven
 source .venv/bin/activate
-
-# 配置 Tushare 凭证（推荐）
 export TUSHARE_TOKEN='你的_TOKEN'
-
-# 周度实测（竞赛提交）
-.venv/bin/python main_weekly.py --asof 2026-04-20
-
-# 历史回测（验证策略有效性）
-.venv/bin/python main_backtest.py --start 2025-12-08 --end 2025-12-26
 ```
+
+如果你已经激活了 `.venv`，可以直接使用 `python`；如果不想依赖当前 shell 环境，下面 README 里的所有命令都可以直接替换成 `.venv/bin/python ...` 执行。
 
 如果不想手动 `export`，也可以直接在 `config/config.yaml` 中写入：
 
@@ -74,6 +68,12 @@ data/events/                   # 正式事件导入目录
 ├── announcement/              # 公司公告类事件导入文件
 ├── industry/                  # 行业/技术类事件导入文件
 └── macro/                     # 宏观/地缘类事件导入文件
+
+data/inbox/events_raw/         # 原始采集留痕（jsonl）
+data/staging/events/           # 标准化候选事件与审阅队列
+
+scripts/
+└── event_ingest.py            # 事件采集/标准化/发布入口
 ```
 
 ## 数据来源
@@ -92,6 +92,48 @@ data/events/                   # 正式事件导入目录
 所有原始数据缓存在 `data/raw/<asof_date>/`，中间结果保存在 `data/processed/<asof_date>/`。
 
 ## 事件导入要求
+
+推荐优先使用项目内采集脚本生成正式事件文件，而不是直接手工改写 `data/events/*`。当前事件链路分为三层：
+
+- `data/inbox/events_raw/<source>/<batch>/records.jsonl`
+  原始抓取留痕，保留标题、正文、发布时间、来源 URL、抓取时间和采集器版本
+- `data/staging/events/<source_type>/`
+  标准化后的候选事件，配套 `data/staging/events/review_queue.csv` 做人工审阅
+- `data/events/<source_type>/`
+  仅保存 `review_status=accepted` 的正式事件文件，由主流程直接读取
+
+### 采集脚本用法
+
+```bash
+# 1) 抓取原始事件（推荐始终使用 .venv/bin/python，避免本机没有 python 别名）
+.venv/bin/python scripts/event_ingest.py collect --source gov_cn --since 2026-04-01 --until 2026-04-07
+
+# 2) 标准化并生成审阅队列
+.venv/bin/python scripts/event_ingest.py normalize --source gov_cn --batch 2026-04-07
+
+# 3) 在 data/staging/events/review_queue.csv 中人工确认 review_status
+
+# 4) 发布 accepted 事件到 data/events/policy/
+.venv/bin/python scripts/event_ingest.py publish --source-type policy --batch 2026-04-07
+```
+
+首批来源支持策略：
+
+- `gov_cn` / `ndrc` / `csrc`
+  政策类事件，优先自动抓取官方站点页面
+- `cninfo`
+  公告类事件，优先接收你导出的 CSV / JSON / URL 清单，再由脚本补抓详情页并标准化
+- `eastmoney_industry` / `36kr_manual`
+  行业新闻类事件，优先做半自动整理
+- `yicai_manual` / `macro_manual`
+  宏观/地缘类事件，优先做半自动整理
+
+手动输入型来源支持：
+
+- `--input xxx.csv`
+- `--input xxx.json`
+- `--input xxx.jsonl`
+- `--input xxx.txt`（一行一个 URL）
 
 正式运行前，请将事件文件放入下列目录之一：
 
@@ -122,6 +164,15 @@ data/events/                   # 正式事件导入目录
   }
 ]
 ```
+
+### 审阅规则建议
+
+- `accepted`
+  标题明确、来源可信、时间在目标窗口内、正文不是噪声、具备明确市场影响意义
+- `rejected`
+  重复转载、标题过短、无明确事件主体、明显不在比赛窗口内
+- `pending`
+  正文过短、来源可信度一般、需要你补详情页或二次确认
 
 ### 比赛周运行前必须检查
 
@@ -159,6 +210,145 @@ python main_weekly.py --asof 2026-04-27
 - `outputs/weekly/<asof_date>/result.xlsx`
 - `outputs/weekly/<asof_date>/report.md`
 - `outputs/weekly/<asof_date>/final_picks.csv`
+
+## 常用命令速查
+
+### 1. 环境与依赖
+
+```bash
+cd /Users/xingranya/Downloads/TeddyCup-C-EventDriven
+source .venv/bin/activate
+python -V
+python -m pip install -r requirements.txt
+```
+
+如果你不想激活虚拟环境，也可以直接：
+
+```bash
+.venv/bin/python -V
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+### 2. 政府网事件抓取（当前最先可用）
+
+```bash
+# 抓取 2026-04-01 到 2026-04-07 的政策事件原始记录
+.venv/bin/python scripts/event_ingest.py collect --source gov_cn --since 2026-04-01 --until 2026-04-07
+
+# 标准化为候选事件，并生成审阅队列
+.venv/bin/python scripts/event_ingest.py normalize --source gov_cn --batch 2026-04-07
+
+# 手动审阅
+open data/staging/events/review_queue.csv
+
+# 审阅完成后，发布 accepted 事件到 data/events/policy/
+.venv/bin/python scripts/event_ingest.py publish --source-type policy --batch 2026-04-07
+```
+
+补充说明：
+
+- `collect` 产物：`data/inbox/events_raw/gov_cn/<batch>/records.jsonl`
+- `normalize` 产物：
+  - `data/staging/events/policy/<batch>_gov_cn.jsonl`
+  - `data/staging/events/review_queue.csv`
+- `publish` 产物：`data/events/policy/policy_YYYYMM.json`
+
+### 3. 其他来源半自动导入
+
+如果你手头已经有 URL 列表、CSV、JSON、JSONL，可以直接导入后走同一套标准化/发布流程：
+
+```bash
+# 例：用 CSV 导入行业新闻
+.venv/bin/python scripts/event_ingest.py collect --source eastmoney_industry --since 2026-04-01 --until 2026-04-07 --input /path/to/industry_urls.csv
+.venv/bin/python scripts/event_ingest.py normalize --source eastmoney_industry --batch 2026-04-07
+.venv/bin/python scripts/event_ingest.py publish --source-type industry --batch 2026-04-07
+```
+
+支持的 `--input` 格式：
+
+- `.csv`
+- `.json`
+- `.jsonl`
+- `.txt`（一行一个 URL）
+
+### 4. 比赛周运行命令
+
+第一周：
+
+```bash
+cd /Users/xingranya/Downloads/TeddyCup-C-EventDriven
+source .venv/bin/activate
+export TUSHARE_TOKEN='你的_TOKEN'
+python main_weekly.py --asof 2026-04-20
+```
+
+第二周：
+
+```bash
+python main_weekly.py --asof 2026-04-27
+```
+
+如果不激活虚拟环境：
+
+```bash
+.venv/bin/python main_weekly.py --asof 2026-04-20
+.venv/bin/python main_weekly.py --asof 2026-04-27
+```
+
+### 5. 历史回测命令
+
+```bash
+source .venv/bin/activate
+python main_backtest.py --start 2025-12-08 --end 2025-12-26
+```
+
+或：
+
+```bash
+.venv/bin/python main_backtest.py --start 2025-12-08 --end 2025-12-26
+```
+
+### 6. 测试命令
+
+最小专项测试：
+
+```bash
+.venv/bin/python -m unittest tests.test_event_ingest
+.venv/bin/python -m unittest tests.test_fetch_data
+.venv/bin/python -m unittest tests.test_report_builder
+```
+
+完整低成本回归：
+
+```bash
+.venv/bin/python -m unittest tests.test_settings tests.test_event_study tests.test_fetch_data tests.test_impact_estimate tests.test_strategy tests.test_result_xlsx tests.test_relation_mining tests.test_report_builder tests.test_workflow tests.test_event_ingest
+```
+
+静态编译检查：
+
+```bash
+.venv/bin/python -m compileall pipeline scripts tests main_weekly.py main_backtest.py generate_result_xlsx.py
+```
+
+### 7. 比赛周前一天的最短操作链
+
+如果你只想知道“比赛前一天最少要敲哪些命令”，按下面走：
+
+```bash
+cd /Users/xingranya/Downloads/TeddyCup-C-EventDriven
+source .venv/bin/activate
+export TUSHARE_TOKEN='你的_TOKEN'
+
+# 先抓取政府网政策事件
+python scripts/event_ingest.py collect --source gov_cn --since 2026-04-06 --until 2026-04-20
+python scripts/event_ingest.py normalize --source gov_cn --batch 2026-04-20
+
+# 人工审阅 review_queue.csv 后，把 review_status 改成 accepted
+python scripts/event_ingest.py publish --source-type policy --batch 2026-04-20
+
+# 然后执行比赛周主流程
+python main_weekly.py --asof 2026-04-20
+```
 
 ## 流水线架构
 

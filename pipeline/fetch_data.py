@@ -419,9 +419,10 @@ def fetch_news(context: RunContext, config: AppConfig, stock_df: pd.DataFrame) -
     if not rows:
         raise RuntimeError(
             "未获取到任何事件数据。请选择以下方式之一：\n"
-            "1. 在 data/events/ 目录下准备事件JSON文件（参见 data/events/ 已有文件格式）\n"
-            "2. 确保网络连接正常以使用 akshare 自动采集\n"
-            "3. 检查 config.yaml 中 events.import_paths 配置是否正确"
+            "1. 运行 scripts/event_ingest.py 完成 collect -> normalize -> publish，将已确认事件发布到 data/events/\n"
+            "2. 手动在 data/events/ 目录下准备事件JSON文件（参见 data/events/ 已有文件格式）\n"
+            "3. 确保网络连接正常以使用 akshare 自动采集\n"
+            "4. 检查 config.yaml 中 events.import_paths 配置是否正确"
         )
 
     news_df = pd.DataFrame(rows).drop_duplicates(

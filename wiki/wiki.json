@@ -1,0 +1,172 @@
+{
+  "id": "2026-04-13-202126",
+  "generated_at": "2026-04-13T12:21:26.407489Z",
+  "language": "zh",
+  "pages": [
+    {
+      "slug": "1-xiang-mu-gai-shu",
+      "title": "项目概述",
+      "file": "1-xiang-mu-gai-shu.md",
+      "section": "入门指南",
+      "level": "Beginner"
+    },
+    {
+      "slug": "2-kuai-su-qi-dong",
+      "title": "快速启动",
+      "file": "2-kuai-su-qi-dong.md",
+      "section": "入门指南",
+      "level": "Beginner"
+    },
+    {
+      "slug": "3-shi-jian-dao-ru-liu-cheng",
+      "title": "事件导入流程",
+      "file": "3-shi-jian-dao-ru-liu-cheng.md",
+      "section": "入门指南",
+      "group": "事件管理",
+      "level": "Beginner"
+    },
+    {
+      "slug": "4-shi-jian-cai-ji-jiao-ben-shi-yong",
+      "title": "事件采集脚本使用",
+      "file": "4-shi-jian-cai-ji-jiao-ben-shi-yong.md",
+      "section": "入门指南",
+      "group": "事件管理",
+      "level": "Intermediate"
+    },
+    {
+      "slug": "5-shi-jian-fen-lei-ti-xi",
+      "title": "事件分类体系",
+      "file": "5-shi-jian-fen-lei-ti-xi.md",
+      "section": "核心概念",
+      "level": "Intermediate"
+    },
+    {
+      "slug": "6-guan-lian-ping-fen-ji-zhi",
+      "title": "关联评分机制",
+      "file": "6-guan-lian-ping-fen-ji-zhi.md",
+      "section": "核心概念",
+      "level": "Intermediate"
+    },
+    {
+      "slug": "7-shi-jian-yan-jiu-fa-yuan-li",
+      "title": "事件研究法原理",
+      "file": "7-shi-jian-yan-jiu-fa-yuan-li.md",
+      "section": "核心概念",
+      "level": "Advanced"
+    },
+    {
+      "slug": "8-re-du-yu-qiang-du-ping-fen",
+      "title": "热度与强度评分",
+      "file": "8-re-du-yu-qiang-du-ping-fen.md",
+      "section": "核心概念",
+      "group": "量化特征",
+      "level": "Intermediate"
+    },
+    {
+      "slug": "9-yu-qi-carji-suan",
+      "title": "预期CAR计算",
+      "file": "9-yu-qi-carji-suan.md",
+      "section": "核心概念",
+      "group": "量化特征",
+      "level": "Intermediate"
+    },
+    {
+      "slug": "10-liu-shui-xian-she-ji",
+      "title": "流水线设计",
+      "file": "10-liu-shui-xian-she-ji.md",
+      "section": "技术架构",
+      "level": "Intermediate"
+    },
+    {
+      "slug": "11-shu-ju-liu-yu-mu-lu-jie-gou",
+      "title": "数据流与目录结构",
+      "file": "11-shu-ju-liu-yu-mu-lu-jie-gou.md",
+      "section": "技术架构",
+      "level": "Advanced"
+    },
+    {
+      "slug": "12-pei-zhi-ti-xi",
+      "title": "配置体系",
+      "file": "12-pei-zhi-ti-xi.md",
+      "section": "技术架构",
+      "level": "Intermediate"
+    },
+    {
+      "slug": "13-shu-ju-cai-ji-mo-kuai",
+      "title": "数据采集模块",
+      "file": "13-shu-ju-cai-ji-mo-kuai.md",
+      "section": "技术架构",
+      "group": "关键模块",
+      "level": "Intermediate"
+    },
+    {
+      "slug": "14-shi-jian-shi-bie-mo-kuai",
+      "title": "事件识别模块",
+      "file": "14-shi-jian-shi-bie-mo-kuai.md",
+      "section": "技术架构",
+      "group": "关键模块",
+      "level": "Advanced"
+    },
+    {
+      "slug": "15-guan-lian-wa-jue-mo-kuai",
+      "title": "关联挖掘模块",
+      "file": "15-guan-lian-wa-jue-mo-kuai.md",
+      "section": "技术架构",
+      "group": "关键模块",
+      "level": "Advanced"
+    },
+    {
+      "slug": "16-ying-xiang-yu-ce-mo-kuai",
+      "title": "影响预测模块",
+      "file": "16-ying-xiang-yu-ce-mo-kuai.md",
+      "section": "技术架构",
+      "group": "关键模块",
+      "level": "Advanced"
+    },
+    {
+      "slug": "17-ce-lue-gou-jian-mo-kuai",
+      "title": "策略构建模块",
+      "file": "17-ce-lue-gou-jian-mo-kuai.md",
+      "section": "技术架构",
+      "group": "关键模块",
+      "level": "Advanced"
+    },
+    {
+      "slug": "18-zhou-du-yun-xing",
+      "title": "周度运行",
+      "file": "18-zhou-du-yun-xing.md",
+      "section": "运行指南",
+      "level": "Beginner"
+    },
+    {
+      "slug": "19-li-shi-hui-ce",
+      "title": "历史回测",
+      "file": "19-li-shi-hui-ce.md",
+      "section": "运行指南",
+      "level": "Intermediate"
+    },
+    {
+      "slug": "20-jie-guo-bao-gao-jie-du",
+      "title": "结果报告解读",
+      "file": "20-jie-guo-bao-gao-jie-du.md",
+      "section": "运行指南",
+      "level": "Intermediate"
+    },
+    {
+      "slug": "21-shu-ju-mu-lu-jie-gou",
+      "title": "数据目录结构",
+      "file": "21-shu-ju-mu-lu-jie-gou.md",
+      "section": "运行指南",
+      "group": "数据管理",
+      "level": "Beginner"
+    },
+    {
+      "slug": "22-shu-ju-huan-cun-ji-zhi",
+      "title": "数据缓存机制",
+      "file": "22-shu-ju-huan-cun-ji-zhi.md",
+      "section": "运行指南",
+      "group": "数据管理",
+      "level": "Intermediate"
+    }
+  ]
+}
